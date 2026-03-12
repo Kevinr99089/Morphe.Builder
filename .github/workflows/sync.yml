@@ -1,0 +1,43 @@
+name: Sync Fork
+
+on:
+  schedule:
+    - cron: '* */3 * * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/j-hc/revanced-magisk-module.git
+
+      - name: Fetch upstream
+        run: git fetch upstream main
+
+      - name: Merge upstream
+        run: |
+          git merge -X theirs upstream/main || true
+          
+      - name: Restore protected files
+        run: |
+          git checkout main -- build.sh config.toml || true
+
+      - name: Commit and push
+        run: |
+          if ! git diff-index --quiet HEAD --; then
+            git add -A
+            git commit -m "chore: sync with upstream j-hc/revanced-magisk-module
+            git push origin main
+          fi

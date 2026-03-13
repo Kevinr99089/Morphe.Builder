@@ -36,7 +36,7 @@ jobs:
           
       - name: Restore protected files
         run: |
-          git checkout main -- build.sh config.toml || true
+          git checkout main -- build.sh config.toml README.md || true
 
       - name: Commit and push
         run: |

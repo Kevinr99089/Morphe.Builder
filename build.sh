@@ -158,8 +158,6 @@ log "$(cat "$TEMP_DIR"/*/changelog.md)"
 AUTH_HEADER=(${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"})
 API_URL="https://api.github.com/repos/$DEF_PATCHES_SRC/releases/$([ "$DEF_PATCHES_VER" = "latest" ] && echo "latest" || echo "tags/$DEF_PATCHES_VER")"
 UPSTREAM_NOTES=$(curl -s "${AUTH_HEADER[@]}" "$API_URL" | jq -r '.body // "*No release notes found on the upstream repository.*"')
-
-log "\n---\n### 📝 Upstream Release Notes (Source: $DEF_PATCHES_SRC)\n\n$UPSTREAM_NOTES"
 # ----------------------------------
 
 SKIPPED=$(cat "$TEMP_DIR"/skipped 2>/dev/null || :)

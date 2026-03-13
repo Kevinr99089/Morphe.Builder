@@ -45,15 +45,7 @@ jobs:
           echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
 
       - name: Build modules/Morphe
-        run: |
-          echo -e "parallel-jobs = 1\n$(cat config.toml)" > config.toml
-          sed -i 's/PARALLEL_JOBS=$(nproc)/PARALLEL_JOBS=1/g' build.sh || true
-          
-          if [ -f "config.json" ]; then 
-            ./build.sh config.json
-          else 
-            ./build.sh config.toml
-          fi
+        run: if [ -f "config.json" ]; then ./build.sh config.json; else ./build.sh config.toml; fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY

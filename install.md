@@ -16,8 +16,7 @@ Links: [Morphe Manager](https://github.com/MorpheApp/Morphe-manager/releases/lat
 <details>
   <summary>Without automatic updates</summary>
 
-Visit the [Releases](https://github.com/kevinr99089/Morphe.Builder/releases) page, scroll down, and click on the desired app (e.g., yt-morphe), then on [MicroG-RE](https://github.com/W
-MorpheApp/MicroG-RE/releases/latest) (necessary for these mods):
+Visit the [Releases](https://github.com/kevinr99089/Morphe.Builder/releases) page, scroll down, and click on the desired app (e.g., yt-morphe), then on [MicroG-RE](https://github.com/MorpheApp/MicroG-RE/releases/latest) (necessary for these mods):
 
 <img src=".github/Installation/03.png">
 

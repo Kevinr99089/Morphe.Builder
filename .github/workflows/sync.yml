@@ -47,6 +47,7 @@ jobs:
         run: |
           cat << 'EOF' > patch_files.py
           import os
+
           if os.path.exists("build.sh"):
               with open("build.sh", "r") as f:
                   content = f.read()
@@ -100,8 +101,10 @@ jobs:
 
       - name: Commit and push
         run: |
-          if ! git diff-index --quiet HEAD --; then
+          if [[ -n "$(git status --porcelain)" ]]; then
             git add -A
             git commit -m "chore: sync with upstream j-hc/revanced-magisk-module"
             git push origin main
+          else
+            echo "No changes to commit, the repository is already up to date."
           fi

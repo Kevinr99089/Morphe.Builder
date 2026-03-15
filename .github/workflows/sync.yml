@@ -27,8 +27,9 @@ jobs:
       - name: Add upstream remote
         run: git remote add upstream https://github.com/j-hc/revanced-magisk-module.git
 
-      - name: Fetch upstream
-        run: git fetch upstream main
+      - name: Fetch upstream branch
+        run: |
+          git fetch upstream refs/heads/main:refs/remotes/upstream/main
 
       - name: Merge upstream
         run: |
@@ -36,7 +37,7 @@ jobs:
           
       - name: Restore protected files
         run: |
-          git checkout main -- build.sh config.toml README.md || true
+          git checkout origin/main -- build.sh config.toml README.md || true
 
       - name: Commit and push
         run: |

@@ -32,7 +32,7 @@ You all deserve more recognition.
 
 # <p align="center"> Warning !
 
-Important: ReVanced, Inotia00, Anddea nor MorpheApp does not share any patched applications and does not recommend downloading pre-patched apps from third-party sites, and neither do I, because such apps may contain malicious code. The safest approach is to use tools like [RV/X Manager](https://github.com/Kevinr99089/Extended.Builder/blob/main/install.md#for-installing-with-revanced-manager-please-follow-this-tutorial) to patch the apps yourself. No site is 100% safe.
+Important: Neither ReVanced, Inotia00, Anddea, nor MorpheApp shares any patched applications and they do not recommend downloading pre-patched apps from third-party sites, and neither do I, because such apps may contain malicious code. The safest approach is to use tools like [Morphe Manager](https://github.com/Kevinr99089/Morphe.Builder/blob/main/install.md) to patch the apps yourself. No site is 100% safe.
 
 # <p align="center"> So why am I using this repository?
 

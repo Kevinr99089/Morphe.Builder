@@ -125,13 +125,14 @@ Perfect, these applications are ready to install. Just click on the download ico
 Once installed, open Obtainium. The application may look complicated, but it's not.  
 Click on **Add App**, and paste this link into **App Source URL**:
 
+<img src=".github/Installation/22.png">
+<details>
+<summary>Install Morphe with Morphe icon</summary>
+ 
  ```console
 https://www.github.com/Kevinr99089/Morphe.Builder
 ```
 
-<img src=".github/Installation/22.png">
-<details>
-<summary>Install Morphe with Morphe icon</summary>
 Once pasted, settings will open. Check "Verify the 'latest' tag":
 <img src=".github/Installation/23.png">
 Scroll a little further, and in "Regular Expression", type "yt-morphe", uncheck "Attempt to filter APKs by CPU architecture if possible", and type the name you want (optional):

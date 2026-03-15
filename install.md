@@ -14,7 +14,53 @@ Links: [Morphe Manager](https://github.com/MorpheApp/Morphe-manager/releases/lat
 ---
 
 <details>
-  <summary>Without automatic updates</summary>
+ <summary>First time installing apps?</summary>
+
+If you are new to installing apps outside the Play Store, you might encounter two common roadblocks.
+
+<details>
+      <summary>
+If you've never installed an app from the web</summary>
+
+When you click the downloaded app, you'll need to enable "Unknown Sources" in your settings:
+
+<img src=".github/Installation/10.png">
+
+and grant the required permission: 
+
+<img src=".github/Installation/11.png">
+
+</details>
+
+<details>
+      <summary>
+Disabling Play Protect (only if the app refuses to install)</summary>
+
+Go to the Play Store, click your profile picture in the top-right corner, then "Manage apps and device":
+
+<img src=".github/Installation/05.png">
+
+then click on "No harmful apps found":
+
+<img src=".github/Installation/06.png">
+
+Click the settings icon at the top-right of the screen:
+
+<img src=".github/Installation/07.png">
+
+and disable "Scan apps with Play Protect":
+
+<img src=".github/Installation/08.png">
+
+Remember to re-enable it after installing your apps.
+
+</details>
+</details>
+
+---
+
+<details>
+ <summary>Method 1: Without automatic updates</summary>
 
 Visit the [Releases](https://github.com/kevinr99089/Morphe.Builder/releases) page, scroll down, and click on the desired app (e.g., yt-morphe), then on [MicroG-RE](https://github.com/MorpheApp/MicroG-RE/releases/latest) (necessary for these mods):
 
@@ -24,84 +70,24 @@ and click on MicroG_RE_x.x.apk:
 
 <img src=".github/Installation/04.png">
 
----
-
-<details>
-      <summary>
-Disabling Play Protect is required, *only if* the app refuses to install.</summary>
-
-Go to the Play Store, click your profile picture in the top-right corner, then "Manage apps and device":
-
-<img src=".github/Installation/05.png">
-
-then click on "No harmful apps found":
-
-<img src=".github/Installation/06.png">
-
-Click the settings icon at the top-right of the screen:
-
-<img src=".github/Installation/07.png">
-
-and disable "Scan apps with Play Protect":
-
-<img src=".github/Installation/08.png">
-
-Remember to re-enable it after installing apps.
-
-</details>
-
-<details>
-      <summary>
-If you've never installed an app from the web</summary>
-
 First, install MicroG_RE_X.X.apk from the notification bar, then yt-morphe-vxx.xx.xx-all.apk:
 
 <img src=".github/Installation/09.png">
 
-Click the app you just downloaded in the notification bar. If you've never installed apps from the web, you'll need to enable "Unknown Sources" in settings:
-
-<img src=".github/Installation/10.png">
-
-and grant the required permission: 
-
-<img src=".github/Installation/11.png">
-
-then proceed to install the app:
+Proceed to install the app:
 
 <img src=".github/Installation/12.png">
 
 Once MicroG services are installed, click OK, then open yt-morphe (from the notification bar) and click "Install":
 
 <img src=".github/Installation/13.png">
-</details>
 
----
-
-After installing these apps, go to your home screen (or Settings > Apps), then open MicroG settings:
-
-<img src=".github/Installation/14.png">
-
-Go to Permissions:
-
-<img src=".github/Installation/15.png">
-
-and enable everything:
-
-<img src=".github/Installation/16.png">
-
-Go back to the previous menu, then go to Battery:
-
-<img src=".github/Installation/31.png">
-
-and set the app to "Unrestricted":
-
-<img src=".github/Installation/17.png">
-
-You're all set! Now, open YT, go to the library, and click "+" to log into your Google account.
+*(Be sure to complete the **Final Step: MicroG Configuration** at the bottom of this page after installation).*
 
 </details>
+
 <details>
-    <summary>Automatic Updates (Obtainium)</summary>
+    <summary>Method 2: Automatic Updates (Obtainium)</summary>
 
 > This installation method was inspired by peternmuller, [support his work](https://github.com/kevinr99089/Morphe.Builder/?tab=readme-ov-file#-thanks-to-).
 
@@ -111,45 +97,9 @@ If you'd like to use Obtainium to easily manage apps and updates, you can downlo
 
 [<img src=".github/Installation/32.png" width="200">](https://github.com/ImranR98/Obtainium/releases/latest/download/app-release.apk)
 
-<details>
-      <summary>
-Disabling Play Protect is required, *only if* the app refuses to install.</summary>
-
-Go to the Play Store, click your profile picture in the top-right corner, then "Manage apps and device":
-
-<img src=".github/Installation/05.png">
-
-then click on "No harmful apps found":
-
-<img src=".github/Installation/06.png">
-
-Click the settings icon at the top-right of the screen:
-
-<img src=".github/Installation/07.png">
-
-and disable "Scan apps with Play Protect":
-
-<img src=".github/Installation/08.png">
-
-Remember to re-enable it after installing apps.
-
-</details>
-
-<details>
-      <summary>
-If you've never installed an app from the web</summary>
-Click the app you just downloaded in the notification bar. If you've never installed apps from the web, you'll need to enable "Unknown Sources" in settings:
-
-<img src=".github/Installation/10.png">
-
-and grant the required permission: 
-
-<img src=".github/Installation/11.png">
-
-then proceed to install the app:
+Click the app you just downloaded in the notification bar and proceed to install the app:
 
 <img src=".github/Installation/21.png">
-</details>
 
 ---
 <details>
@@ -167,142 +117,85 @@ Once installed, select the application for which you wish to add a pre-configura
 Perfect, these applications are ready to install. Just click on the download icon and install these applications:
 <img src=".github/Installation/29.png">
 
-After installing these apps, go to your home screen (or Settings > Apps), then open MicroG settings:
-
-<img src=".github/Installation/14.png">
-
-Go to Permissions:
-
-<img src=".github/Installation/15.png">
-
-and enable everything :
-
-<img src=".github/Installation/16.png">
-
-Go back to the previous menu, then go to Battery: 
-
-<img src=".github/Installation/31.png">
-
-and set the app to "Unrestricted":
-
-<img src=".github/Installation/17.png">
-
-You're all set! Now, open YT, go to the library, and click "+" to log into your Google account.
+*(Be sure to complete the **Final Step: MicroG Configuration** at the bottom of this page after installation).*
+</details>
 
 <details>
-   <summary>Expert mode</summary>
+  <summary>Expert mode</summary>
 Once installed, open Obtainium. The application may look complicated, but it's not.  
 Click on **Add App**, and paste this link into **App Source URL**:
 
-  ```console
+ ```console
 https://www.github.com/Kevinr99089/Morphe.Builder
 ```
 
 <img src=".github/Installation/22.png">
-
 <details>
-    <summary>Install Morphe with Morphe icon</summary>
-
+<summary>Install Morphe with Morphe icon</summary>
 Once pasted, settings will open. Check "Verify the 'latest' tag":
-
 <img src=".github/Installation/23.png">
-
-Scroll a little further, and in **"Regular Expression"**, type "yt-morphe", uncheck **"Attempt to filter APKs by CPU architecture if possible"**, and type the name you want (optional):
-
+Scroll a little further, and in "Regular Expression", type "yt-morphe", uncheck "Attempt to filter APKs by CPU architecture if possible", and type the name you want (optional):
 <img src=".github/Installation/24.png">
-
-Scroll up again and click on **"Add"**:
-
+Scroll up again and click on "Add":
 <img src=".github/Installation/25.png">
-
 </details>
-
 <details>
-    <summary>Install Morphe with Extended icon</summary>
-
+<summary>Install Morphe with Extended icon</summary>
 Click again on "Add App", and paste this link into App Source URL *:
+
 ```console
 https://www.github.com/Kevinr99089/Morphe.Builder
 ```
+
 Check again "Verify the 'latest' tag":
-
 <img src=".github/Installation/23.png">
-
 Scroll down and in "Regular Expression", type "yt-revancify", check "Attempt to filter APKs by CPU architecture if possible", and type the name you want (optional):
-
 <img src=".github/Installation/26.png">
-
 Scroll up and click on "Add":
-
 <img src=".github/Installation/25.png">
-
 </details>
+Click for the last time on "Add App", and paste this link into App Source 
 
-Click for the last time on "Add App", and paste this link into App Source URL *:
 ```console
 https://github.com/WSTxda/MicroG-RE
 ```
+
 Check "Verify the 'latest' tag":
-
 <img src=".github/Installation/23.png">
-
 Since this release has only one application, don’t set "Regular Expressions", uncheck "Attempt to filter APKs by CPU architecture if possible", and type the name you want (optional):
-
 <img src=".github/Installation/27.png">
-
 Then type "Add":
-
 <img src=".github/Installation/28.png">
-
 Perfect, these applications are ready to install. Just click on the download icon for the applications:
 <img src=".github/Installation/29.png">
-
-After installing these apps, go to your home screen (or Settings > Apps), then open MicroG settings:
-
-<img src=".github/Installation/14.png">
-
-Go to Permissions:
-
-<img src=".github/Installation/15.png">
-
-and enable everything:
-
-<img src=".github/Installation/16.png">
-
-Go back to the previous menu, then go to Battery: 
-
-<img src=".github/Installation/31.png">
-
-and set the app to "Unrestricted":
-
-<img src=".github/Installation/17.png">
-
-You're all set! Now, open YT, go to the library, and click "+" to log into your Google account.
-
----
+(Be sure to complete the Final Step: MicroG Configuration at the bottom of this page after installation).
 </details>
-
 </details>
-
----
-
+________________
 <details>
-    <summary>About Regular Expressions in Obtainium</summary>
-
+<summary>Final Step: MicroG Configuration (Required for all methods)</summary>
+After installing your chosen apps through any of the methods above, go to your home screen (or Settings > Apps), then open MicroG settings:
+<img src=".github/Installation/14.png">
+Go to Permissions:
+<img src=".github/Installation/15.png">
+and enable everything:
+<img src=".github/Installation/16.png">
+Go back to the previous menu, then go to Battery:
+<img src=".github/Installation/31.png">
+and set the app to "Unrestricted":
+<img src=".github/Installation/17.png">
+You're all set! Now, open YT, go to the library, and click "+" to log into your Google account.
+</details>
+________________
+<details>
+<summary>About Regular Expressions in Obtainium</summary>
 Regular expressions are used in Obtainium to filter applications in releases, which is especially useful when multiple APKs are available in a release.
-
-**Q: What are regular expressions?**
-
-**A:** Regular expressions allow you to specify patterns to filter applications. This is particularly helpful when a release contains multiple applications:
-
-  <img src=".github/Installation/30.png">
-
-In this example, there are two applications: `yt-morphe` and `yt-revancify`.
-If you use `yt-morphe` as the regular expression, Obtainium will suggest all applications that match this pattern. Alternatively, it will automatically select and download `yt-morphe` without prompting you during each release. By enabling **"Invert regular expression"**, it will suggest all applications that **do not** contain `yt-morphe` in their name. In this case, `yt-revancify` will be the default selection.
-
+Q: What are regular expressions?
+A: Regular expressions allow you to specify patterns to filter applications. This is particularly helpful when a release contains multiple applications:
+<img src=".github/Installation/30.png">
+In this example, there are two applications: yt-morphe and yt-revancify.
+If you use yt-morphe as the regular expression, Obtainium will suggest all applications that match this pattern. Alternatively, it will automatically select and download yt-morphe without prompting you during each release. By enabling "Invert regular expression", it will suggest all applications that do not contain yt-morphe in their name. In this case, yt-revancify will be the default selection.
 However, avoid using the application version as a regular expression because, with updates, the specific version may no longer be available.
-
 More information here: [Obtainium Wiki](https://wiki.obtainium.imranr.dev/) .
-
 Aside from regular expressions, Obtainium simplifies installation, checks for updates at regular intervals (based on your settings), and sends notifications when updates are available for your apps. You can also use it in combination with Shizuku to automate update installations. Note that if there are multiple releases, automatic installation may not occur.
 </details>

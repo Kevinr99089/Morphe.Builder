@@ -6,12 +6,12 @@
 
   [![Github Releases](https://img.shields.io/github/downloads/kevinr99089/Morphe.Builder/total?style=flat&label=Downloads&labelColor=black&logo=youtube&logoColor=FF0000)](https://github.com/kevinr99089/Morphe.Builder/releases)
 
-> To use these applications, you **need to install [MicroG-RE](https://github.com/MorpheApp/MicroG-RE/releases/latest)**. View [applied patches](https://github.com/kevinr99089/morphe.Builder/blob/main/config.toml).
+> To use these applications, you **need to install [MicroG-RE](https://github.com/MorpheApp/MicroG-RE/releases/latest)**. View [applied patches](https://github.com/kevinr99089/Morphe.Builder/blob/main/config.toml).
 
 ## <p align="center"> Learn more :
-- [History of Morphe](https://github.com/kevinr99089/Extended.Builder/blob/main/history.md)
+- [History of Morphe](https://github.com/kevinr99089/Morphe.Builder/blob/main/history.md)
 
-- [Install Morphe](https://github.com/kevinr99089/Extended.Builder/blob/main/install.md)
+- [Install Morphe](https://github.com/kevinr99089/Morphe.Builder/blob/main/install.md)
 
 ## <p align="center"> Thanks to :
 >[!NOTE]

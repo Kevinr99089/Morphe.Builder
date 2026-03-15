@@ -155,7 +155,9 @@ Scroll down and in "Regular Expression", type "yt-revancify", check "Attempt to 
 Scroll up and click on "Add":
 <img src=".github/Installation/25.png">
 </details>
-Click for the last time on "Add App", and paste this link into App Source 
+<details>
+<summary>Install MicroG-RE</summary>
+Click for the last time on "Add App", and paste this link into App Source:
 
 ```console
 https://github.com/WSTxda/MicroG-RE
@@ -172,7 +174,10 @@ Perfect, these applications are ready to install. Just click on the download ico
 (Be sure to complete the Final Step: MicroG Configuration at the bottom of this page after installation).
 </details>
 </details>
-________________
+</details>
+
+---
+
 <details>
 <summary>Final Step: MicroG Configuration (Required for all methods)</summary>
 After installing your chosen apps through any of the methods above, go to your home screen (or Settings > Apps), then open MicroG settings:
@@ -187,7 +192,9 @@ and set the app to "Unrestricted":
 <img src=".github/Installation/17.png">
 You're all set! Now, open YT, go to the library, and click "+" to log into your Google account.
 </details>
-________________
+
+---
+
 <details>
 <summary>About Regular Expressions in Obtainium</summary>
 Regular expressions are used in Obtainium to filter applications in releases, which is especially useful when multiple APKs are available in a release.

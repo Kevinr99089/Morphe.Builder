@@ -65,10 +65,15 @@ jobs:
 
       - name: Commit and push
         run: |
+          git add -A
+          
           if [[ -n "$(git status --porcelain)" ]]; then
-            git add -A
-            git commit -m "chore: sync with upstream j-hc/revanced-magisk-module"
+            git commit -m "chore: apply custom patches"
+          fi
+          
+          if [[ $(git rev-parse HEAD) != $(git rev-parse origin/main) ]]; then
             git push origin main
+            echo "Updates successfully synchronized and dispatched."
           else
             echo "No changes to commit, the repository is already up to date."
           fi

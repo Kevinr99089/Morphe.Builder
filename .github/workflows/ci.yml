@@ -20,7 +20,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! git checkout origin/update build.md; then
+          gh release view -R $GITHUB_REPOSITORY --json body -q .body > build.md 2>/dev/null || > build.md
+          
+          if [ ! -s build.md ]; then
             echo "first time building!"
             echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
           else

@@ -32,19 +32,27 @@ jobs:
         run: |
           cat << 'EOF' > patch.py
           import os
+          import re
 
           def replace_in_file(filepath, old_text, new_text):
               if os.path.exists(filepath):
                   with open(filepath, "r") as f: content = f.read()
+                  if old_text not in content:
+                      print(f"[WARNING] This part not found {filepath} : '{old_text[:30]}...'")
                   with open(filepath, "w") as f: f.write(content.replace(old_text, new_text))
+
+          def regex_replace(filepath, pattern, new_text):
+              if os.path.exists(filepath):
+                  with open(filepath, "r") as f: content = f.read()
+                  new_content, count = re.subn(pattern, new_text, content, flags=re.DOTALL)
+                  if count == 0:
+                      print(f"[ATTENTION] La regex n'a rien trouvé dans {filepath}. Le code source a peut-être changé.")
+                  with open(filepath, "w") as f: f.write(new_content)
 
           replace_in_file("build.sh", 'DEF_PATCHES_SRC="ReVanced/revanced-patches"', 'DEF_PATCHES_SRC="MorpheApp/morphe-patches"')
           replace_in_file("build.sh", 'DEF_CLI_SRC="ReVanced/revanced-cli"', 'DEF_CLI_SRC="MorpheApp/morphe-cli"')
           replace_in_file("build.sh", 'DEF_RV_BRAND="ReVanced"', 'DEF_RV_BRAND="Morphe"')
-          replace_in_file(".github/workflows/build.yml", 'Build modules/APKs', 'Build modules/Morphe')
-          replace_in_file(".github/workflows/build.yml", 'release_name: ReVanced', 'release_name: Morphe')
-          replace_in_file(".github/workflows/ci.yml", '- cron: "0 16 * * *"', '- cron: "0 */1 * * *"')
-
+          
           old_block = r"""log "\nInstall [Microg](https://github.com/ReVanced/GmsCore/releases) for non-root YouTube and YT Music APKs"
           log "Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music modules from Play Store"
           log "\n[revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)\n"
@@ -60,6 +68,34 @@ jobs:
           # ----------------------------------"""
 
           replace_in_file("build.sh", old_block, new_block)
+          regex_replace("build.sh", r"mkdir -p \$\{MODULE_TEMPLATE_DIR\}/bin/arm64.*?cmpr-x86_64\"", r"")
+          regex_replace("build.sh", r"ENABLE_MODULE_UPDATE=\$\(toml_get.*?ENABLE_MODULE_UPDATE=false\nfi", r"")
+
+          replace_in_file(".github/workflows/build.yml", 'Build modules/APKs', 'Build modules/Morphe')
+          replace_in_file(".github/workflows/build.yml", 'release_name: ReVanced', 'release_name: Morphe')
+          regex_replace(".github/workflows/build.yml", r"- name: Update changelog and update json.*?- name: Report to Telegram", r"- name: Report to Telegram")
+
+          replace_in_file(".github/workflows/ci.yml", '- cron: "0 16 * * *"', '- cron: "0 */1 * * *"')
+          regex_replace(".github/workflows/ci.yml",
+                        r"if ! git checkout origin/update build\.md; then.*?fi\n\s*fi",
+                        r"""gh release view -R $GITHUB_REPOSITORY --json body -q .body > build.md 2>/dev/null || > build.md
+                    if [ ! -s build.md ]; then
+                      echo "first time building!"
+                      echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
+                    else
+                      UPDATE_CFG=$(./build.sh config.toml --config-update)
+                      if [ "$UPDATE_CFG" ]; then
+                        echo "'$UPDATE_CFG'"
+                        echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
+                      else
+                        echo "SHOULD_BUILD=0" >> $GITHUB_OUTPUT
+                      fi
+                    fi""")
+
+          replace_in_file("utils.sh", 'build_mode_arr=(apk module)', 'build_mode_arr=(apk)')
+          replace_in_file("utils.sh", 'build_mode_arr=(module)', 'build_mode_arr=(apk)')
+          regex_replace("utils.sh", r"module_config\(\) \{.*?module_prop\(\) \{.*?\n\}", r"")
+
           EOF
           
           python3 patch.py

@@ -73,7 +73,9 @@ jobs:
 
           replace_in_file(".github/workflows/build.yml", 'Build modules/APKs', 'Build modules/Morphe')
           replace_in_file(".github/workflows/build.yml", 'release_name: ReVanced', 'release_name: Morphe')
-          regex_replace(".github/workflows/build.yml", r"- name: Update changelog and update json.*?- name: Report to Telegram", r"- name: Report to Telegram")
+
+          regex_replace(".github/workflows/build.yml", r"\s*- name: Report to Telegram.*?(?=\n\s*- name: |\Z)", r"")
+          regex_replace(".github/workflows/build.yml", r"\s*- name: Update changelog and update json.*?(?=\n\s*- name: |\Z)", r"")
 
           replace_in_file(".github/workflows/ci.yml", '- cron: "0 16 * * *"', '- cron: "0 */1 * * *"')
           regex_replace(".github/workflows/ci.yml",

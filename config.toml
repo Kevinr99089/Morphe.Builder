@@ -5,7 +5,7 @@ parallel-jobs = 1
 [YT] # Default patches are applied, Except line 7 and 8 :
 rv-brand = "Morphe"
 excluded-patches = "'Swipe controls'"
-patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/logos/morphe/'"
+patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/logos/morphe_play/'"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 
 [YT-Revancify] # Default patches are applied, Except line 13 and 14 :

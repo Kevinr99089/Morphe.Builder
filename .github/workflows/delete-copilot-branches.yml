@@ -1,0 +1,27 @@
+name: Delete Copilot Branches
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  delete-copilot-branches:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all copilot/* branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branches=$(gh api repos/$GITHUB_REPOSITORY/branches --paginate -q '.[].name' | grep '^copilot/' || true)
+          if [ -n "$branches" ]; then
+            while IFS= read -r branch; do
+              echo "Deleting branch: $branch"
+              gh api "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch" -X DELETE && echo "Deleted: $branch" || echo "Failed to delete: $branch"
+            done <<< "$branches"
+          else
+            echo "No copilot/* branches found."
+          fi

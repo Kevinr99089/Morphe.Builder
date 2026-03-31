@@ -8,7 +8,7 @@ excluded-patches = "'Swipe controls'"
 patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/logos/morphe_play/'"
 uptodown-dlurl = "https://youtube.en.uptodown.com/android"
 
-[YT-Revancify] # Default patches are applied, Except line 13 and 14 :
+[YT-Revancify] # Same patches applied as before, but with Extended icon:
 rv-brand = "Blue"
 excluded-patches = "'Swipe controls'"
 patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/logos/revancify_blue/'"

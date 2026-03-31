@@ -1,41 +1,28 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright 2025 Morphe. This is copyrighted content, and not licensed under open source terms.
-     See https://github.com/MorpheApp/morphe-branding -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="512"
-    android:viewportHeight="512">
-
-    <group
-        android:scaleX="0.6"
-        android:scaleY="0.6"
-        android:translateX="102.4"
-        android:translateY="102.4">
-
-        <path
-            android:fillColor="#1E5AA8"
-            android:pathData="M123,140c-21,0 -39,17 -40,38v192c1,21 19,38 40,38 21,0 39,-17 40,-38V178c-1,-21 -19,-38 -40,-38z" />
-        <path
-            android:fillColor="#00AFAE"
-            android:pathData="M349,285v85c1,21 19,38 40,38 21,0 39,-17 40,-38V182c-11,-14 -74,63 -80,103z" />
-        <path android:pathData="M127,108c-34,0 -44,25 -44,40v54c30,-33 75,27 80,33 28,32 44,87 93,89 48,-2 67,-56 93,-89 0,0 45,-74 80,-80 0,-28 -11,-47 -44,-47 -34,0 -58,50 -75,72 -17,22 -25,46 -54,46 -29,0 -38,-25 -54,-46 -17,-22 -41,-72 -75,-72z">
-            <aapt:attr name="android:fillColor">
-                <gradient
-                    android:endX="429"
-                    android:endY="216"
-                    android:startX="83"
-                    android:startY="216"
-                    android:type="linear">
-                    <item
-                        android:color="#1E5AA8"
-                        android:offset="0" />
-                    <item
-                        android:color="#00AFAE"
-                        android:offset="1" />
-                </gradient>
-            </aapt:attr>
-        </path>
-    </group>
+<vector
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:name="vector"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="384"
+    android:viewportHeight="384">
+    <path
+        android:name="path_1"
+        android:pathData="M 128.306 175.903 C 128.723 161.286 137.628 148.649 151.43 146.232 C 161.503 144.485 175.026 143 192 143 C 208.974 143 222.497 144.485 232.57 146.232 C 246.372 148.649 255.277 161.286 255.694 175.903 C 255.889 181.61 256 187.492 256 192.5 C 256 197.508 255.889 203.39 255.694 209.098 C 255.277 223.715 246.372 236.351 232.57 238.768 C 222.497 240.515 208.974 242 192 242 C 175.026 242 161.503 240.515 151.43 238.768 C 137.628 236.351 128.723 223.715 128.306 209.098 C 128.139 203.39 128 197.508 128 192.5 C 128 187.492 128.139 181.61 128.306 175.903 Z"
+        android:fillColor="#ffffff"
+        android:strokeWidth="1"/>
+    <path
+        android:name="path_2"
+        android:pathData="M 140.249 179.927 C 140.588 168.853 147.823 159.279 159.036 157.448 C 167.221 156.125 178.209 155 192 155 C 205.791 155 216.779 156.125 224.964 157.448 C 236.177 159.279 243.412 168.853 243.751 179.927 C 243.91 184.25 244 188.706 244 192.5 C 244 196.294 243.91 200.75 243.751 205.074 C 243.412 216.147 236.177 225.721 224.964 227.552 C 216.779 228.875 205.791 230 192 230 C 178.209 230 167.221 228.875 159.036 227.552 C 147.823 225.721 140.588 216.147 140.249 205.074 C 140.113 200.75 140 196.294 140 192.5 C 140 188.706 140.113 184.25 140.249 179.927 Z"
+        android:fillColor="#000000"
+        android:strokeWidth="1"/>
+    <path
+        android:name="path_3"
+        android:pathData="M 180 180.493 C 180 172.419 188.113 167.38 194.617 171.428 L 213.122 182.914 C 219.626 186.962 219.626 197.039 213.122 201.087 L 194.617 212.572 C 188.113 216.62 180 211.581 180 203.507 L 180 180.493 Z"
+        android:fillColor="#978bff"
+        android:strokeWidth="1"/>
+    <path
+        android:name="path_4"
+        android:pathData="M 166 184.157 C 166 178.651 171.762 175.222 176.398 177.965 L 189.54 185.808 C 194.153 188.55 194.153 195.45 189.54 198.193 L 176.398 206.035 C 171.762 208.778 166 205.349 166 199.842 L 166 184.157 Z"
+        android:fillColor="#ffffff"
+        android:strokeWidth="1"/>
 </vector>

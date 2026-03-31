@@ -1,12 +1,8 @@
 # <p align="center"> Welcome to Morphe.Builder✨
 
-## <p align="center"> Available apps :
 > Let's dream of an even better app !
-- YT and YT Music (Arm64-v8a).
-
-  [![Github Releases](https://img.shields.io/github/downloads/kevinr99089/Morphe.Builder/total?style=flat&label=Downloads&labelColor=black&logo=youtube&logoColor=FF0000)](https://github.com/kevinr99089/Morphe.Builder/releases)
-
-> To use these applications, you **need to install [MicroG-RE](https://github.com/MorpheApp/MicroG-RE/releases/latest)**. View [applied patches](https://github.com/kevinr99089/Morphe.Builder/blob/main/config.toml).
+>
+> To use Morphe, you **need to install [MicroG-RE](https://github.com/MorpheApp/MicroG-RE/releases/latest)**. View [applied patches](https://github.com/kevinr99089/Morphe.Builder/blob/main/config.toml). [![Github Releases](https://img.shields.io/github/downloads/kevinr99089/Morphe.Builder/total?style=flat&label=Downloads&labelColor=black&logo=youtube&logoColor=FF0000)](https://github.com/kevinr99089/Morphe.Builder/releases)
 
 ## <p align="center"> Learn more :
 - [History of Morphe](https://github.com/kevinr99089/Morphe.Builder/blob/main/history.md)

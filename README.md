@@ -11,7 +11,9 @@
 
 ## <p align="center"> Thanks to :
 >[!NOTE]
-> **I am NOT MorpheApp, this repository is [not hosted, approved or supported by them](https://github.com/kevinr99089/Morphe.Builder/blob/main/history.md#-warning-), support their efforts.**
+> This app uses code from Morphe. To learn more, visit https://morphe.software
+>
+>> **I am NOT MorpheApp, this repository is [not hosted, approved or supported by them](https://github.com/kevinr99089/Morphe.Builder/blob/main/history.md#-warning-), support their efforts.**
 - **[j-hc](https://github.com/j-hc), Creator of this Module.**
 
 - **[MorpheApp](https://github.com/MorpheApp), The successor to Extended from Inotia00, creator of mods for YT and Music.**

@@ -6,13 +6,13 @@ parallel-jobs = 1
 rv-brand = "Morphe"
 excluded-patches = "'Swipe controls'"
 patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/logos/morphe_play/'"
-uptodown-dlurl = "https://youtube.en.uptodown.com/android"
+uapkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube/"
 
 [YT-Revancify] # Same patches applied as before, but with Extended icon:
 rv-brand = "Blue"
 excluded-patches = "'Swipe controls'"
 patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/logos/revancify_blue/'"
-uptodown-dlurl = "https://youtube.en.uptodown.com/android"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube/"
 
 # [Music] is no longer available :
 # use Metrolist instead: https://github.com/MetrolistGroup/Metrolist .

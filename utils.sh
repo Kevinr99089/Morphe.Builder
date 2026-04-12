@@ -329,10 +329,18 @@ merge_splits() {
 # -------------------- apkmirror --------------------
 apkmirror_search() {
 	local resp="$1" dpi="$2" arch="$3" apk_bundle="$4"
-	local apparch dlurl="" node app_table emptyCheck
-	if [ "$arch" = all ]; then
-		apparch=(universal noarch 'arm64-v8a + armeabi-v7a')
-	else apparch=("$arch" universal noarch 'arm64-v8a + armeabi-v7a'); fi
+	local dlurl="" node app_table emptyCheck
+
+	local apparch=('universal' 'noarch' 'arm64-v8a + armeabi-v7a')
+	if [ "$arch" != all ]; then
+		apparch+=("$arch")
+	fi
+
+	local appdpi=("nodpi" "anydpi")
+	if [ "$dpi" ]; then
+		appdpi+=($dpi)
+	fi
+
 	for ((n = 1; n < 40; n++)); do
 		node=$($HTMLQ "div.table-row.headerFont:nth-last-child($n)" -r "span:nth-child(n+3)" <<<"$resp")
 		if [ -z "$node" ]; then break; fi

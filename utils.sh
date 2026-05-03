@@ -581,21 +581,22 @@ build_rv() {
 	[ "${args[exclusive_patches]}" = true ] && p_patcher_args+=("--exclusive")
 
 	local tried_dl=()
-	for dl_p in "${DL_SRCS[@]}"; do
-		if [ -z "${args[${dl_p}_dlurl]}" ]; then continue; fi
-		if [ "${args[pkg_name]}" ]; then
-			pkg_name="${args[pkg_name]}"
+	if [ "${args[pkg_name]}" ]; then
+		pkg_name="${args[pkg_name]}"
+	else
+		for dl_p in "${DL_SRCS[@]}"; do
+			if [ -z "${args[${dl_p}_dlurl]}" ]; then continue; fi
+			if ! get_${dl_p}_resp "${args[${dl_p}_dlurl]}" || ! pkg_name=$(get_"${dl_p}"_pkg_name); then
+				args[${dl_p}_dlurl]=""
+				epr "ERROR: Could not find ${table} in ${dl_p}"
+				continue
+			fi
+			tried_dl+=("$dl_p")
+			dl_from=$dl_p
 			break
-		fi
-		if ! get_${dl_p}_resp "${args[${dl_p}_dlurl]}" || ! pkg_name=$(get_"${dl_p}"_pkg_name); then
-			args[${dl_p}_dlurl]=""
-			epr "ERROR: Could not find ${table} in ${dl_p}"
-			continue
-		fi
-		tried_dl+=("$dl_p")
-		dl_from=$dl_p
-		break
-	done
+		done
+	fi
+
 	if [ -z "$pkg_name" ]; then
 		epr "empty pkg name, not building ${table}."
 		return 0
@@ -694,32 +695,43 @@ build_rv() {
         patched_apk="${TEMP_DIR}/${app_name_l}-${rv_brand_f}-${version_f}-${arch_f}.apk"
     fi
 
-    local stock_apk_to_patch="${stock_apk}.stripped.apk"
-    cp -f "$stock_apk" "$stock_apk_to_patch"
-    
-    if [ "$arch" = "arm64-v8a" ]; then
-        zip -d "$stock_apk_to_patch" "lib/armeabi-v7a/*" "lib/x86_64/*" "lib/x86/*" >/dev/null 2>&1 || :
-    elif [ "$arch" = "arm-v7a" ]; then
-        zip -d "$stock_apk_to_patch" "lib/arm64-v8a/*" "lib/x86_64/*" "lib/x86/*" >/dev/null 2>&1 || :
-    elif [ "$arch" = "x86" ]; then
-        zip -d "$stock_apk_to_patch" "lib/arm64-v8a/*" "lib/x86_64/*" "lib/armeabi-v7a/*" >/dev/null 2>&1 || :
-    elif [ "$arch" = "x86_64" ]; then
-        zip -d "$stock_apk_to_patch" "lib/arm64-v8a/*" "lib/armeabi-v7a/*" "lib/x86/*" >/dev/null 2>&1 || :
-    else
-        zip -d "$stock_apk_to_patch" "lib/x86_64/*" "lib/x86/*" >/dev/null 2>&1 || :
-    fi
-    
-    if [ "${NORB:-}" != true ] || [ ! -f "$patched_apk" ]; then
-        if ! patch_apk "$stock_apk_to_patch" "$patched_apk" "${patcher_args[*]}" "${args[cli]}" "${args[ptjar]}"; then
-            epr "Building '${table}' failed!"
-            return 0
-        fi
-    fi
-    rm "$stock_apk_to_patch"
-    
-    local apk_output="${BUILD_DIR}/${app_name_l}-${rv_brand_f}-v${version_f}-${arch_f}.apk"
-    mv -f "$patched_apk" "$apk_output"
-    pr "Built ${table} (non-root): '${apk_output}'"
+		local stock_apk_to_patch="${stock_apk}.stripped.apk"
+		cp -f "$stock_apk" "$stock_apk_to_patch"
+		if [ "$build_mode" = module ]; then
+			zip -d "$stock_apk_to_patch" "lib/*" >/dev/null 2>&1 || :
+		else
+			if [ "$arch" = "arm64-v8a" ]; then
+				zip -d "$stock_apk_to_patch" "lib/armeabi-v7a/*" "lib/x86_64/*" "lib/x86/*" >/dev/null 2>&1 || :
+			elif [ "$arch" = "arm-v7a" ]; then
+				zip -d "$stock_apk_to_patch" "lib/arm64-v8a/*" "lib/x86_64/*" "lib/x86/*" >/dev/null 2>&1 || :
+			elif [ "$arch" = "x86" ]; then
+				zip -d "$stock_apk_to_patch" "lib/arm64-v8a/*" "lib/x86_64/*" "lib/armeabi-v7a/*" >/dev/null 2>&1 || :
+			elif [ "$arch" = "x86_64" ]; then
+				zip -d "$stock_apk_to_patch" "lib/arm64-v8a/*" "lib/armeabi-v7a/*" "lib/x86/*" >/dev/null 2>&1 || :
+			else
+				zip -d "$stock_apk_to_patch" "lib/x86_64/*" "lib/x86/*" >/dev/null 2>&1 || :
+			fi
+		fi
+
+		local apk_output="${BUILD_DIR}/${app_name_l}-${rv_brand_f}-v${version_f}-${arch_f}.apk"
+		if [ "${NORB:-}" = false ] || { [ ! -f "$patched_apk" ] && [ ! -f "$apk_output" ]; }; then
+			if ! patch_apk "$stock_apk_to_patch" "$patched_apk" "${patcher_args[*]}" "${args[cli]}" "${args[ptjar]}"; then
+				epr "Building '${table}' failed!"
+				return 0
+			fi
+		fi
+		rm "$stock_apk_to_patch"
+		if [ "$build_mode" = apk ]; then
+			if [ "${NORB:-}" = false ] || { [ ! -f "$patched_apk" ] && [ ! -f "$apk_output" ]; }; then
+				mv -f "$patched_apk" "$apk_output"
+			fi
+			pr "Built ${table} (non-root): '${apk_output}'"
+			continue
+		fi
+		local base_template
+		base_template=$(mktemp -d -p "$TEMP_DIR")
+		cp -a $MODULE_TEMPLATE_DIR/. "$base_template"
+		local upj="${table,,}-update.json"
 
 		module_config "$base_template" "$pkg_name" "$version" "$arch"
 
@@ -742,8 +754,8 @@ build_rv() {
 				cp -f "$stock_apk" "${base_template}/stock/base.apk"
 			elif [ "${args[include_stock]}" = "split" ]; then
 				if [ ! -f "${stock_apk}.apkm" ]; then
-					epr "Cannot include as 'split' because stock apk of $table_name is not bundle"
-					continue
+					epr "Cannot include as 'split' because stock apk of $table_name is not a bundle"
+					return 0
 				fi
 				if [ "$arch" = "arm64-v8a" ]; then
 					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86_64.apk' -x '*x86.apk' -x '*armeabi_v7a.apk' -d "${base_template}/stock/" >/dev/null 2>&1

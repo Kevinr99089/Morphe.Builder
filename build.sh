@@ -86,6 +86,16 @@ for table_name in $(toml_get_table_names); do
 	app_args[app_name]=$(toml_get "$t" app-name) || app_args[app_name]=$table_name
 	app_args[patcher_args]=$(toml_get "$t" patcher-args) || app_args[patcher_args]=""
 	app_args[table]=$table_name
+	app_args[build_mode]=$(toml_get "$t" build-mode) && {
+		if ! isoneof "${app_args[build_mode]}" both apk module; then
+			abort "ERROR: build-mode '${app_args[build_mode]}' is not a valid option for '${table_name}': only 'both', 'apk' or 'module' is allowed"
+		fi
+	} || app_args[build_mode]=apk
+	app_args[include_stock]=$(toml_get "$t" include-stock) && {
+		if ! isoneof "${app_args[include_stock]}" disable merged split; then
+			abort "ERROR: include-stock '${app_args[include_stock]}' is not a valid option for '${table_name}': only 'disable', 'merged' or 'split' is allowed"
+		fi
+	} || app_args[include_stock]=merged
 
 	for dl_from in "${DL_SRCS[@]}"; do
 		if app_args[${dl_from}_dlurl]=$(toml_get "$t" "${dl_from}-dlurl"); then
@@ -103,7 +113,11 @@ for table_name in $(toml_get_table_names); do
 		abort "wrong arch '${app_args[arch]}' for '$table_name'"
 	fi
 
-	app_args[dpi]=$(toml_get "$t" dpi) || app_args[dpi]="$DEF_DPI_LIST"
+	app_args[pkg_name]=$(toml_get "$t" pkg-name) || app_args[pkg_name]=""
+	app_args[dpi]=$(toml_get "$t" dpi) || app_args[dpi]=""
+	table_name_f=${table_name,,}
+	table_name_f=${table_name_f// /-}
+	app_args[module_prop_name]=$(toml_get "$t" module-prop-name) || app_args[module_prop_name]="${table_name_f}-jhc"
 
 	if [ "${app_args[arch]}" = both ]; then
 		app_args[table]="$table_name (arm64-v8a)"

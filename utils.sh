@@ -253,7 +253,7 @@ semver_validate() {
 	[ ${#ac} = 0 ]
 }
 get_patch_last_supported_ver() {
-	local list_patches=$1 pkg_name=$2 inc_sel=$3 _exc_sel=$4 _exclusive=$5
+	local list_patches=$1 pkg_name=$2 inc_sel=$3 _exc_sel=$4 _exclusive=$5 # TODO: resolve using all of these
 	local op
 	if [ "$inc_sel" ]; then
 		if ! op=$(awk '{$1=$1}1' <<<"$list_patches"); then
@@ -333,6 +333,7 @@ merge_splits() {
 		epr "APKEditor error: $OP"
 		return 1
 	fi
+	# sign the merged stock apk
 	if ! OP=$(java -jar "$APKSIGNER" sign --ks ks-p12.keystore --ks-pass pass:123456789 --key-pass pass:123456789 --ks-key-alias jhc \
 		--out "${output}" "${output}-unsigned"); then
 		epr "apksigner error: $OP"
@@ -372,6 +373,7 @@ apkmirror_search() {
 		fi
 	done
 	if [ "$n" -eq 2 ] && [ "$dlurl" ]; then
+		# only one apk exists, return it
 		echo "$dlurl"
 		return 0
 	fi
@@ -444,11 +446,12 @@ get_uptodown_resp() {
 get_uptodown_vers() { $HTMLQ --text ".version" <<<"$__UPTODOWN_RESP__"; }
 dl_uptodown() {
 	local uptodown_dlurl=$1 version=$2 output=$3 arch=$4 _dpi=$5
-	local apparch
 	if [ "$arch" = "arm-v7a" ]; then arch="armeabi-v7a"; fi
-	if [ "$arch" = all ]; then
-		apparch=('arm64-v8a, armeabi-v7a, x86_64' 'arm64-v8a, armeabi-v7a, x86, x86_64' 'arm64-v8a, armeabi-v7a')
-	else apparch=("$arch" 'arm64-v8a, armeabi-v7a, x86_64' 'arm64-v8a, armeabi-v7a, x86, x86_64' 'arm64-v8a, armeabi-v7a'); fi
+
+	local apparch=('arm64-v8a, armeabi-v7a, x86_64' 'arm64-v8a, armeabi-v7a, x86, x86_64' 'arm64-v8a, armeabi-v7a')
+	if [ "$arch" != all ]; then
+		apparch+=("$arch")
+	fi
 
 	local op resp data_code
 	data_code=$($HTMLQ "#detail-app-name" --attribute data-code <<<"$__UPTODOWN_RESP__")
@@ -530,7 +533,7 @@ get_archive_pkg_name() { echo "$__ARCHIVE_PKG_NAME__"; }
 
 # -------------------- direct --------------------
 dl_direct() {
-	local url=$1 version=${2// /-} output=$3 arch=$4 dpi=$5
+	local url=$1 version=${2// /-} output=$3 arch=$4 _dpi=$5
 	req "$url" "${output}" || return 1
 }
 get_direct_vers() { cut -d- -f2 <<<"$__DIRECT_APKNAME__"; }
@@ -543,6 +546,7 @@ patch_apk() {
 	local cmd="java -jar '$cli_jar' patch '$stock_input' --purge -o '$patched_apk' -p '$patches_jar' --keystore=ks.keystore \
 --keystore-entry-password=123456789 --keystore-password=123456789 --signer=jhc --keystore-entry-alias=jhc $patcher_args"
 
+	# TODO: remove this later
 	local cli_name
 	cli_name=$(basename "$cli_jar")
 	if [ "${cli_name::8}" = revanced ]; then cmd+=" -b"; fi
@@ -568,7 +572,7 @@ check_sig() {
 build_rv() {
 	eval "declare -A args=${1#*=}"
 	local version="" pkg_name=""
-	local version_mode=${args[version]}
+	local mode_arg=${args[build_mode]} version_mode=${args[version]}
 	local app_name=${args[app_name]}
 	local app_name_l=${app_name,,}
 	app_name_l=${app_name_l// /-}
@@ -630,6 +634,14 @@ build_rv() {
 		return 0
 	fi
 
+	if [ "$mode_arg" = module ]; then
+		build_mode_arr=(apk)
+	elif [ "$mode_arg" = apk ]; then
+		build_mode_arr=(apk)
+	elif [ "$mode_arg" = both ]; then
+		build_mode_arr=(apk)
+	fi
+
 	pr "Choosing version '${version}' for ${table}"
 	local version_f=${version// /}
 	version_f=${version_f#v}
@@ -682,20 +694,25 @@ build_rv() {
 		p_patcher_args=("${p_patcher_args[@]//-[ei] ${microg_patch}/}")
 	fi
 
-	local patcher_args patched_apk
+	local patcher_args patched_apk build_mode
 	local rv_brand_f=${args[rv_brand],,}
 	rv_brand_f=${rv_brand_f// /-}
 	if [ "${args[patcher_args]}" ]; then p_patcher_args+=("${args[patcher_args]}"); fi
-	
-    patcher_args=("${p_patcher_args[@]}")
-    pr "Building '${table}' as APK"
-    
-    if [ -n "$microg_patch" ]; then
-        patched_apk="${TEMP_DIR}/${app_name_l}-${rv_brand_f}-${version_f}-${arch_f}-apk.apk"
-        patcher_args+=("-e \"${microg_patch}\"")
-    else
-        patched_apk="${TEMP_DIR}/${app_name_l}-${rv_brand_f}-${version_f}-${arch_f}.apk"
-    fi
+	for build_mode in "${build_mode_arr[@]}"; do
+		patcher_args=("${p_patcher_args[@]}")
+		pr "Building '${table}' in '$build_mode' mode"
+		if [ -n "$microg_patch" ]; then
+			patched_apk="${TEMP_DIR}/${app_name_l}-${rv_brand_f}-${version_f}-${arch_f}-${build_mode}.apk"
+		else
+			patched_apk="${TEMP_DIR}/${app_name_l}-${rv_brand_f}-${version_f}-${arch_f}.apk"
+		fi
+		if [ -n "$microg_patch" ]; then
+			if [ "$build_mode" = apk ]; then
+				patcher_args+=("-e \"${microg_patch}\"")
+			elif [ "$build_mode" = module ]; then
+				patcher_args+=("-d \"${microg_patch}\"")
+			fi
+		fi
 
 		local stock_apk_to_patch="${stock_apk}.stripped.apk"
 		cp -f "$stock_apk" "$stock_apk_to_patch"

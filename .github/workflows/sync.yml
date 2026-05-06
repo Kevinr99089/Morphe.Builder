@@ -46,7 +46,7 @@ jobs:
                   with open(filepath, "r") as f: content = f.read()
                   new_content, count = re.subn(pattern, new_text, content, flags=re.DOTALL)
                   if count == 0:
-                      print(f"[ATTENTION] La regex n'a rien trouvé dans {filepath}. Le code source a peut-être changé.")
+                      print(f"[WARNING] The regex found nothing in {filepath}. The source code may have changed.")
                   with open(filepath, "w") as f: f.write(new_content)
 
           replace_in_file("build.sh", 'DEF_PATCHES_SRC="ReVanced/revanced-patches"', 'DEF_PATCHES_SRC="MorpheApp/morphe-patches"')
@@ -73,7 +73,6 @@ jobs:
 
           replace_in_file(".github/workflows/build.yml", 'Build modules/APKs', 'Build modules/Morphe')
           replace_in_file(".github/workflows/build.yml", 'release_name: ReVanced', 'release_name: Morphe')
-
           regex_replace(".github/workflows/build.yml", r"\s*- name: Report to Telegram.*?(?=\n\s*- name: |\Z)", r"")
           regex_replace(".github/workflows/build.yml", r"\s*- name: Update changelog and update json.*?(?=\n\s*- name: |\Z)", r"")
 
@@ -94,8 +93,10 @@ jobs:
                       fi
                     fi""")
 
-          replace_in_file("utils.sh", 'build_mode_arr=(apk module)', 'build_mode_arr=(apk)')
-          replace_in_file("utils.sh", 'build_mode_arr=(module)', 'build_mode_arr=(apk)')
+          regex_replace("utils.sh", r'if \[ "\$mode_arg" = module \]; then.*?fi', 'build_mode_arr=(apk)')
+
+          regex_replace("utils.sh", r'\s*local base_template.*?pr "Built \$\{table\} \(root\): \'\$\{BUILD_DIR\}/\$\{module_output\}\'"', '')
+
           regex_replace("utils.sh", r"module_config\(\) \{.*?module_prop\(\) \{.*?\n\}", r"")
 
           EOF

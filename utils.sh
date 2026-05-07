@@ -634,13 +634,7 @@ build_rv() {
 		return 0
 	fi
 
-	if [ "$mode_arg" = module ]; then
-		build_mode_arr=(apk)
-	elif [ "$mode_arg" = apk ]; then
-		build_mode_arr=(apk)
-	elif [ "$mode_arg" = both ]; then
-		build_mode_arr=(apk)
-	fi
+	build_mode_arr=(apk)
 
 	pr "Choosing version '${version}' for ${table}"
 	local version_f=${version// /}
@@ -747,53 +741,6 @@ build_rv() {
 			pr "Built ${table} (non-root): '${apk_output}'"
 			continue
 		fi
-		local base_template
-		base_template=$(mktemp -d -p "$TEMP_DIR")
-		cp -a $MODULE_TEMPLATE_DIR/. "$base_template"
-		local upj="${table,,}-update.json"
-
-		module_config "$base_template" "$pkg_name" "$version" "$arch"
-
-		local patches_ver="${patches_jar##*-}"
-		module_prop \
-			"${args[module_prop_name]}" \
-			"${app_name} ${args[rv_brand]}" \
-			"${version} (patches ${patches_ver})" \
-			"${app_name} ${args[rv_brand]} module" \
-			"https://raw.githubusercontent.com/${GITHUB_REPOSITORY-}/update/${upj}" \
-			"$base_template"
-
-		local module_output="${app_name_l}-${rv_brand_f}-module-v${version_f}-${arch_f}.zip"
-		pr "Packing module ${table}"
-		cp -f "$patched_apk" "${base_template}/base.apk"
-
-		if [ "${args[include_stock]}" != "disable" ]; then
-			mkdir -p "${base_template}/stock/"
-			if [ "${args[include_stock]}" = "merged" ]; then
-				cp -f "$stock_apk" "${base_template}/stock/base.apk"
-			elif [ "${args[include_stock]}" = "split" ]; then
-				if [ ! -f "${stock_apk}.apkm" ]; then
-					epr "Cannot include as 'split' because stock apk of $table_name is not a bundle"
-					return 0
-				fi
-				if [ "$arch" = "arm64-v8a" ]; then
-					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86_64.apk' -x '*x86.apk' -x '*armeabi_v7a.apk' -d "${base_template}/stock/" >/dev/null 2>&1
-				elif [ "$arch" = "arm-v7a" ]; then
-					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86_64.apk' -x '*x86.apk' -x '*arm64_v8a.apk' -d "${base_template}/stock/" >/dev/null 2>&1
-				elif [ "$arch" = "x86" ]; then
-					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86_64.apk' -x '*arm64_v8a.apk' -x '*armeabi_v7a.apk' -d "${base_template}/stock/" >/dev/null 2>&1
-				elif [ "$arch" = "x86_64" ]; then
-					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86.apk' -x '*arm64_v8a.apk' -x '*armeabi_v7a.apk' -d "${base_template}/stock/" >/dev/null 2>&1
-				else
-					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86_64.apk' -x '*x86.apk' -d "${base_template}/stock/" >/dev/null 2>&1
-				fi
-			fi
-		fi
-
-		pushd >/dev/null "$base_template" || abort "Module template dir not found"
-		zip -"$COMPRESSION_LEVEL" -FSqr "${CWD}/${BUILD_DIR}/${module_output}" .
-		popd >/dev/null || :
-		pr "Built ${table} (root): '${BUILD_DIR}/${module_output}'"
 	done
 }
 

@@ -15,4 +15,5 @@ patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/
 archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 
 # [Music] is no longer available :
-# use Metrolist instead: https://github.com/MetrolistGroup/Metrolist .
+# use [Metrolist](https://github.com/MetrolistGroup/Metrolist/releases/latest),
+# or [OpenTune](https://github.com/Arturo254/OpenTune/releases/latest) instead.

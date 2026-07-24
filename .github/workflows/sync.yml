@@ -33,21 +33,43 @@ jobs:
           cat << 'EOF' > patch.py
           import os
           import re
+          import sys
+
+          MAX_ERRORS = 3
+          errors = []
 
           def replace_in_file(filepath, old_text, new_text):
-              if os.path.exists(filepath):
+              if not os.path.exists(filepath):
+                  return
+              try:
                   with open(filepath, "r") as f: content = f.read()
                   if old_text not in content:
-                      print(f"[WARNING] This part not found {filepath} : '{old_text[:30]}...'")
+                      msg = f"[WARNING] This part not found {filepath} : '{old_text[:30]}...'"
+                      print(msg)
+                      errors.append(msg)
+                      return
                   with open(filepath, "w") as f: f.write(content.replace(old_text, new_text))
+              except Exception as e:
+                  msg = f"[ERROR] Failed to patch {filepath}: {e}"
+                  print(msg)
+                  errors.append(msg)
 
           def regex_replace(filepath, pattern, new_text):
-              if os.path.exists(filepath):
+              if not os.path.exists(filepath):
+                  return
+              try:
                   with open(filepath, "r") as f: content = f.read()
                   new_content, count = re.subn(pattern, new_text, content, flags=re.DOTALL)
                   if count == 0:
-                      print(f"[WARNING] The regex found nothing in {filepath}. The source code may have changed.")
+                      msg = f"[WARNING] The regex found nothing in {filepath}. The source code may have changed."
+                      print(msg)
+                      errors.append(msg)
+                      return
                   with open(filepath, "w") as f: f.write(new_content)
+              except Exception as e:
+                  msg = f"[ERROR] Failed to patch {filepath}: {e}"
+                  print(msg)
+                  errors.append(msg)
 
           replace_in_file("build.sh", 'DEF_PATCHES_SRC="ReVanced/revanced-patches"', 'DEF_PATCHES_SRC="MorpheApp/morphe-patches"')
           replace_in_file("build.sh", 'DEF_CLI_SRC="ReVanced/revanced-cli"', 'DEF_CLI_SRC="MorpheApp/morphe-cli"')
@@ -98,6 +120,12 @@ jobs:
           regex_replace("utils.sh", r'\s*local base_template.*?pr "Built \$\{table\} \(root\): \'\$\{BUILD_DIR\}/\$\{module_output\}\'"', '')
 
           regex_replace("utils.sh", r"module_config\(\) \{.*?module_prop\(\) \{.*?\n\}", r"")
+
+          if errors:
+              print(f"\n{len(errors)} patch operation(s) failed or matched nothing.")
+          if len(errors) > MAX_ERRORS:
+              print(f"[FATAL] Too many failures ({len(errors)} > {MAX_ERRORS}), aborting sync.")
+              sys.exit(1)
 
           EOF
           

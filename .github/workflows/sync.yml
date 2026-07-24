@@ -53,7 +53,7 @@ jobs:
           replace_in_file("build.sh", 'DEF_CLI_SRC="ReVanced/revanced-cli"', 'DEF_CLI_SRC="MorpheApp/morphe-cli"')
           replace_in_file("build.sh", 'DEF_RV_BRAND="ReVanced"', 'DEF_RV_BRAND="Morphe"')
           
-          old_block = r"""log "\nInstall [Microg](https://github.com/ReVanced/GmsCore/releases) for non-root YouTube and YT Music APKs"
+          old_block = r"""log "\nInstall [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs"
           log "Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music modules from Play Store"
           log "\n[revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)\n"
           log "$(cat "$TEMP_DIR"/*/changelog.md)"""

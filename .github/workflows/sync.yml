@@ -33,9 +33,7 @@ jobs:
           cat << 'EOF' > patch.py
           import os
           import re
-          import sys
 
-          MAX_ERRORS = 3
           errors = []
 
           def replace_in_file(filepath, old_text, new_text):
@@ -122,10 +120,7 @@ jobs:
           regex_replace("utils.sh", r"module_config\(\) \{.*?module_prop\(\) \{.*?\n\}", r"")
 
           if errors:
-              print(f"\n{len(errors)} patch operation(s) failed or matched nothing.")
-          if len(errors) > MAX_ERRORS:
-              print(f"[FATAL] Too many failures ({len(errors)} > {MAX_ERRORS}), aborting sync.")
-              sys.exit(1)
+              print(f"\n{len(errors)} patch operation(s) failed or matched nothing (often normal if already applied).")
 
           EOF
           

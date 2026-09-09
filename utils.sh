@@ -730,7 +730,7 @@ build_rv() {
 	local microg_patch
 	microg_patch=$(grep "^Name: " <<<"$list_patches" | grep -i "gmscore\|microg" || :) microg_patch=${microg_patch#*: }
 	if [ -n "$microg_patch" ] && [[ ${p_patcher_args[*]} =~ $microg_patch ]]; then
-		wpr "You cant include/exclude microg patch as that's done by rvmm builder automatically."
+		wpr "Cannot include/exclude microg patch as that's done by rvmm builder automatically."
 		p_patcher_args=("${p_patcher_args[@]//-[ei] ${microg_patch}/}")
 	fi
 
@@ -747,10 +747,20 @@ build_rv() {
 			patched_apk="${TEMP_DIR}/${app_name_l}-${rv_brand_f}-${version_f}-${arch_f}.apk"
 		fi
 		if [ -n "$microg_patch" ]; then
-			if [ "$build_mode" = apk ]; then
+			if [ "$build_mode" = "apk" ]; then
 				patcher_args+=("-e \"${microg_patch}\"")
-			elif [ "$build_mode" = module ]; then
+			elif [ "$build_mode" = "module" ]; then
 				patcher_args+=("-d \"${microg_patch}\"")
+			fi
+		fi
+
+		if [ "${args[enable_update_checks]}" = "true" ] && [ "$build_mode" = "apk" ]; then
+			if [ -n "${GITHUB_REPOSITORY-}" ]; then
+				if [ "${GITHUB_REPOSITORY}" = "j-hc/revanced-magisk-module" ]; then
+					patcher_args+=("-p ${BIN_DIR}/jhc-update-check.mpp -e 'j-hc Update Check'")
+				else
+					wpr "enable-update-checks is only implemented for j-hc/revanced-magisk-module"
+				fi
 			fi
 		fi
 

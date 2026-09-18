@@ -42,12 +42,14 @@ if [ "${2-}" = "--config-update" ]; then
 fi
 
 : >build.md
+
 if ((COMPRESSION_LEVEL > 9)) || ((COMPRESSION_LEVEL < 0)); then abort "compression-level must be within 0-9"; fi
 
 rm -rf module/bin/*/tmp.*
 for file in "$TEMP_DIR"/*/changelog.md; do
 	[ -f "$file" ] && : >"$file"
 done
+
 
 
 idx=0
@@ -157,6 +159,7 @@ AUTH_HEADER=(${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"})
 API_URL="https://api.github.com/repos/$DEF_PATCHES_SRC/releases/$([ "$DEF_PATCHES_VER" = "latest" ] && echo "latest" || echo "tags/$DEF_PATCHES_VER")"
 UPSTREAM_NOTES=$(curl -s "${AUTH_HEADER[@]}" "$API_URL" | jq -r '.body // "*No release notes found on the upstream repository.*"')
 log "\n$UPSTREAM_NOTES\n"
+"
 
 SKIPPED=$(cat "$TEMP_DIR"/skipped 2>/dev/null || :)
 if [ -n "$SKIPPED" ]; then

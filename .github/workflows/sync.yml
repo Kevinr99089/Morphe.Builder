@@ -24,8 +24,8 @@ jobs:
           git config user.email "action@github.com"
           git remote add upstream https://github.com/j-hc/revanced-magisk-module.git
           git fetch upstream refs/heads/main:refs/remotes/upstream/main
-          git merge -X theirs upstream/main || true
-          git checkout origin/main -- config.toml README.md || true
+          git read-tree -u --reset upstream/main
+          git checkout origin/main -- config.toml README.md .github/workflows/sync.yml || true
           git rm -rf --ignore-unmatch module/ ksu_profile/ CONFIG.md build-termux.sh .github/ISSUE_TEMPLATE/ || true
 
       - name: Inject custom code
@@ -91,10 +91,27 @@ jobs:
           regex_replace("build.sh", r"mkdir -p \$\{MODULE_TEMPLATE_DIR\}/bin/arm64.*?cmpr-x86_64\"", r"")
           regex_replace("build.sh", r"ENABLE_MODULE_UPDATE=\$\(toml_get.*?ENABLE_MODULE_UPDATE=false\nfi", r"")
 
-          replace_in_file(".github/workflows/build.yml", 'Build modules/APKs', 'Build modules/Morphe')
+          replace_in_file(".github/workflows/build.yml",
+              '        if: ${{ inputs.from_ci }}\n        run: |\n          if git checkout origin/update build.md; then',
+              '        if: ${{ inputs.from_ci }}\n        env:\n          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n        run: |\n          gh release view -R $GITHUB_REPOSITORY --json body -q .body > build.md 2>/dev/null || > build.md\n          if [ -s build.md ]; then')
+
+          replace_in_file(".github/workflows/build.yml", 'Build modules/APKs', 'Build Morphe')
           replace_in_file(".github/workflows/build.yml", 'release_name: ReVanced', 'release_name: Morphe')
           regex_replace(".github/workflows/build.yml", r"\s*- name: Report to Telegram.*?(?=\n\s*- name: |\Z)", r"")
-          regex_replace(".github/workflows/build.yml", r"\s*- name: Update changelog and update json.*?(?=\n\s*- name: |\Z)", r"")
+
+          replace_in_file(".github/workflows/build.yml",
+              'echo "${DELIM}" >> "$GITHUB_OUTPUT"\n          cp -f build.md build.tmp\n      \n      - name: Upload release',
+              'echo "${DELIM}" >> "$GITHUB_OUTPUT"\n\n      - name: Upload release')
+
+          replace_in_file(".github/workflows/build.yml",
+              '      - name: Update modules changelog and update json\n        id: update_config\n        run: |\n          git checkout -f update || git switch --discard-changes --orphan update\n          cp -f build.tmp build.md\n          get_update_json() {',
+              '      - name: Update modules changelog and update json\n        id: update_config\n        run: |\n          get_update_json() {')
+
+          replace_in_file(".github/workflows/build.yml",
+              '\\"changelog\\": \\"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\\"',
+              '\\"changelog\\": \\"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/build.md\\"')
+
+          replace_in_file(".github/workflows/build.yml", 'git push origin HEAD:update', 'git push origin HEAD:main')
 
           replace_in_file(".github/workflows/ci.yml", '- cron: "0 16 * * *"', '- cron: "0 */1 * * *"')
           regex_replace(".github/workflows/ci.yml",

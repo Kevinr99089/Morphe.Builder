@@ -61,6 +61,7 @@ jobs:
           echo "BUILD_LOG<<${DELIM}" >> "$GITHUB_OUTPUT"
           cat build.md >> "$GITHUB_OUTPUT"
           echo "${DELIM}" >> "$GITHUB_OUTPUT"
+          cp -f build.md build.tmp
 
       - name: Update modules changelog and update json
         id: update_config

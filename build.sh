@@ -151,7 +151,7 @@ _clean_tmp
 if [ -z "$(ls -A1 "${BUILD_DIR}")" ]; then abort "All builds failed."; fi
 
 log "$(cat "$TEMP_DIR"/*/changelog.md)"
-log "For YT Music, you can use [OpenTune](https://github.com/Arturo254/OpenTune)."
+log "For YT Music, you can use [ArchiveTune](https://github.com/rukamori/ArchiveTune)."
 
 AUTH_HEADER=(${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"})
 API_URL="https://api.github.com/repos/$DEF_PATCHES_SRC/releases/$([ "$DEF_PATCHES_VER" = "latest" ] && echo "latest" || echo "tags/$DEF_PATCHES_VER")"

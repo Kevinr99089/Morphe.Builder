@@ -18,15 +18,13 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.SYNC_AUTH }}
 
-      - name: Sync upstream & clean files
+      - name: Sync upstream files
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git remote add upstream https://github.com/j-hc/revanced-magisk-module.git
           git fetch upstream refs/heads/main:refs/remotes/upstream/main
-          git read-tree -u --reset upstream/main
-          git checkout origin/main -- config.toml README.md .github/workflows/sync.yml || true
-          git rm -rf --ignore-unmatch module/ ksu_profile/ CONFIG.md build-termux.sh .github/ISSUE_TEMPLATE/ || true
+          git checkout upstream/main -- build.sh utils.sh .github/workflows/build.yml .github/workflows/ci.yml
 
       - name: Inject custom code
         run: |
@@ -72,20 +70,19 @@ jobs:
           replace_in_file("build.sh", 'DEF_PATCHES_SRC="ReVanced/revanced-patches"', 'DEF_PATCHES_SRC="MorpheApp/morphe-patches"')
           replace_in_file("build.sh", 'DEF_CLI_SRC="ReVanced/revanced-cli"', 'DEF_CLI_SRC="MorpheApp/morphe-cli"')
           replace_in_file("build.sh", 'DEF_RV_BRAND="ReVanced"', 'DEF_RV_BRAND="Morphe"')
-          
-          old_block = r"""log "\nInstall [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs"
-          log "Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music modules from Play Store"
-          log "\n[revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)\n"
-          log "$(cat "$TEMP_DIR"/*/changelog.md)"""
 
-          new_block = r"""log "$(cat "$TEMP_DIR"/*/changelog.md)"
+          old_block = '''log "\\nInstall [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs"
+          log "Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music modules from Play Store"
+          log "\\n[revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)\\n"
+          log "$(cat "$TEMP_DIR"/*/changelog.md)"'''
+
+          new_block = '''log "$(cat "$TEMP_DIR"/*/changelog.md)"
           log "For YT Music, you can use [ArchiveTune](https://github.com/rukamori/ArchiveTune)."
 
           AUTH_HEADER=(${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"})
           API_URL="https://api.github.com/repos/$DEF_PATCHES_SRC/releases/$([ "$DEF_PATCHES_VER" = "latest" ] && echo "latest" || echo "tags/$DEF_PATCHES_VER")"
           UPSTREAM_NOTES=$(curl -s "${AUTH_HEADER[@]}" "$API_URL" | jq -r '.body // "*No release notes found on the upstream repository.*"')
-          log "\n$UPSTREAM_NOTES\n"
-          """
+          log "\\n$UPSTREAM_NOTES\\n"'''
 
           replace_in_file("build.sh", old_block, new_block)
           regex_replace("build.sh", r"mkdir -p \$\{MODULE_TEMPLATE_DIR\}/bin/arm64.*?cmpr-x86_64\"", r"")

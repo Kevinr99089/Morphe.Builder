@@ -27,11 +27,8 @@ jobs:
 
       - name: Update config
         if: ${{ inputs.from_ci }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view -R $GITHUB_REPOSITORY --json body -q .body > build.md 2>/dev/null || > build.md
-          if [ -s build.md ]; then
+          if git checkout origin/update build.md; then
             UPDATE_CFG=$(./build.sh config.toml --config-update)
             if [ "$UPDATE_CFG" ]; then
               echo "$UPDATE_CFG" > config.json

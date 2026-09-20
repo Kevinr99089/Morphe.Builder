@@ -28,7 +28,9 @@ jobs:
       - name: Update config
         if: ${{ inputs.from_ci }}
         run: |
-          if git checkout origin/update build.md; then
+          export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          gh release view -R "$GITHUB_REPOSITORY" --json body -q .body >build.md 2>/dev/null || : >build.md
+          if [ -s build.md ]; then
             UPDATE_CFG=$(./build.sh config.toml --config-update)
             if [ "$UPDATE_CFG" ]; then
               echo "$UPDATE_CFG" > config.json
@@ -58,7 +60,8 @@ jobs:
           echo "BUILD_LOG<<${DELIM}" >> "$GITHUB_OUTPUT"
           cat build.md >> "$GITHUB_OUTPUT"
           echo "${DELIM}" >> "$GITHUB_OUTPUT"
-
+          cp -f build.md build.tmp
+      
       - name: Upload release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -70,45 +73,4 @@ jobs:
             gh release upload "$TAG" ./build/* --clobber
           else
             gh release create "$TAG" ./build/* --title "Release" --notes "$BODY"
-          fi
-
-      - name: Update modules changelog and update json
-        id: update_config
-        run: |
-          get_update_json() {
-            echo "{
-            \"version\": \"$1\",
-            \"versionCode\": ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }},
-            \"zipUrl\": \"$2\",
-            \"changelog\": \"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/build.md\"
-          }"
-          }
-
-          cd build || { echo "build folder not found"; exit 1; }
-          for OUTPUT in *module*.zip; do
-            [ "$OUTPUT" = "*module*.zip" ] && continue
-            ZIP_S=$(unzip -p "$OUTPUT" module.prop)
-            if ! UPDATE_JSON=$(echo "$ZIP_S" | grep updateJson); then continue; fi
-            UPDATE_JSON="${UPDATE_JSON##*/}"
-            VER=$(echo "$ZIP_S" | grep version=)
-            VER="${VER##*=}"
-            DLURL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}/${OUTPUT}"
-            get_update_json "$VER" "$DLURL" >"../$UPDATE_JSON"
-          done
-          cd ..
-
-          find . -name "*-update.json" | grep . || : >dummy-update.json
-
-      - name: Commit module json changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-      
-          git add build.md *-update.json
-      
-          if ! git diff --cached --quiet; then
-            git commit -m "Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
-            git push origin HEAD:main
-          else
-            echo "no changes!"
           fi

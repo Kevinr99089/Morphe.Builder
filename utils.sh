@@ -618,6 +618,7 @@ build_rv() {
 	eval "declare -A args=${1#*=}"
 	local version="" pkg_name=""
 	local mode_arg=${args[build_mode]} version_mode=${args[version]}
+	mode_arg=apk
 	local app_name=${args[app_name]}
 	local app_name_l=${app_name,,}
 	app_name_l=${app_name_l// /-}
@@ -685,7 +686,13 @@ build_rv() {
 		return 0
 	fi
 
-	build_mode_arr=(apk)
+	if [ "$mode_arg" = module ]; then
+		build_mode_arr=(module)
+	elif [ "$mode_arg" = apk ]; then
+		build_mode_arr=(apk)
+	elif [ "$mode_arg" = both ]; then
+		build_mode_arr=(apk module)
+	fi
 
 	pr "Choosing version '${version}' for ${table}"
 	local version_f=${version// /}
@@ -825,10 +832,77 @@ build_rv() {
 			pr "Built ${table} (non-root): '${apk_output}'"
 			continue
 		fi
+		local base_template
+		base_template=$(mktemp -d -p "$TEMP_DIR")
+		cp -a $MODULE_TEMPLATE_DIR/. "$base_template"
+		local upj="${table,,}-update.json"
+
+		module_config "$base_template" "$pkg_name" "$version" "$arch"
+
+		local patches_ver="${patches_jar##*-}"
+		module_prop \
+			"${args[module_prop_name]}" \
+			"${app_name} ${args[rv_brand]}" \
+			"${version} (patches ${patches_ver})" \
+			"${app_name} ${args[rv_brand]} module" \
+			"https://raw.githubusercontent.com/${GITHUB_REPOSITORY-}/update/${upj}" \
+			"$base_template"
+
+		local module_output="${app_name_l}-${rv_brand_f}-module-v${version_f}-${arch_f}.zip"
+		pr "Packing module ${table}"
+		cp -f "$patched_apk" "${base_template}/base.apk"
+
+		if [ "${args[include_stock]}" != "disable" ]; then
+			mkdir -p "${base_template}/stock/"
+			if [ "${args[include_stock]}" = "merged" ]; then
+				cp -f "$stock_apk" "${base_template}/stock/base.apk"
+			elif [ "${args[include_stock]}" = "split" ]; then
+				if [ ! -f "${stock_apk}.apkm" ]; then
+					epr "Cannot include as 'split' because stock apk of $table_name is not a bundle"
+					return 0
+				fi
+				if [ "$arch" = "arm64-v8a" ]; then
+					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86_64.apk' -x '*x86.apk' -x '*armeabi_v7a.apk' -d "${base_template}/stock/" >/dev/null 2>&1
+				elif [ "$arch" = "arm-v7a" ]; then
+					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86_64.apk' -x '*x86.apk' -x '*arm64_v8a.apk' -d "${base_template}/stock/" >/dev/null 2>&1
+				elif [ "$arch" = "x86" ]; then
+					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86_64.apk' -x '*arm64_v8a.apk' -x '*armeabi_v7a.apk' -d "${base_template}/stock/" >/dev/null 2>&1
+				elif [ "$arch" = "x86_64" ]; then
+					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86.apk' -x '*arm64_v8a.apk' -x '*armeabi_v7a.apk' -d "${base_template}/stock/" >/dev/null 2>&1
+				else
+					unzip -j "${stock_apk}.apkm" '*.apk' -x '*x86_64.apk' -x '*x86.apk' -d "${base_template}/stock/" >/dev/null 2>&1
+				fi
+			fi
+		fi
+
+		pushd >/dev/null "$base_template" || abort "Module template dir not found"
+		zip -"$COMPRESSION_LEVEL" -FSqr "${CWD}/${BUILD_DIR}/${module_output}" .
+		popd >/dev/null || :
+		pr "Built ${table} (root): '${BUILD_DIR}/${module_output}'"
 	done
 }
 
 list_args() { tr -d '\t\r' <<<"$1" | tr -s ' ' | sed 's/" "/"\n"/g' | sed 's/\([^"]\)"\([^"]\)/\1'\''\2/g' | grep -v '^$' || :; }
 join_args() { list_args "$1" | sed "s/^/${2} /" | paste -sd " " - || :; }
 
+module_config() {
+	local ma=""
+	if [ "$4" = "arm64-v8a" ]; then
+		ma="arm64"
+	elif [ "$4" = "arm-v7a" ]; then
+		ma="arm"
+	fi
+	echo "PKG_NAME=$2
+PKG_VER=$3
+MODULE_ARCH=$ma" >"$1/config"
+}
+module_prop() {
+	echo "id=${1}
+name=${2}
+version=v${3}
+versionCode=${NEXT_VER_CODE}
+author=j-hc
+description=${4}" >"${6}/module.prop"
 
+	if [ "$ENABLE_MODULE_UPDATE" = true ]; then echo "updateJson=${5}" >>"${6}/module.prop"; fi
+}

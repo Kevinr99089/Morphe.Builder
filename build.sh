@@ -42,14 +42,17 @@ if [ "${2-}" = "--config-update" ]; then
 fi
 
 : >build.md
-
+ENABLE_MODULE_UPDATE=$(toml_get "$main_config_t" enable-module-update) || ENABLE_MODULE_UPDATE=true
+if [ "$ENABLE_MODULE_UPDATE" = true ] && [ -z "${GITHUB_REPOSITORY-}" ]; then
+	pr "You are building locally. Module updates will not be enabled."
+	ENABLE_MODULE_UPDATE=false
+fi
 if ((COMPRESSION_LEVEL > 9)) || ((COMPRESSION_LEVEL < 0)); then abort "compression-level must be within 0-9"; fi
 
 rm -rf module/bin/*/tmp.*
 for file in "$TEMP_DIR"/*/changelog.md; do
 	[ -f "$file" ] && : >"$file"
 done
-
 
 
 idx=0
@@ -155,10 +158,19 @@ if [ -z "$(ls -A1 "${BUILD_DIR}")" ]; then abort "All builds failed."; fi
 log "$(cat "$TEMP_DIR"/*/changelog.md)"
 log "For YT Music, you can use [ArchiveTune](https://github.com/rukamori/ArchiveTune)."
 
-AUTH_HEADER=(${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"})
-API_URL="https://api.github.com/repos/$DEF_PATCHES_SRC/releases/$([ "$DEF_PATCHES_VER" = "latest" ] && echo "latest" || echo "tags/$DEF_PATCHES_VER")"
-UPSTREAM_NOTES=$(curl -s "${AUTH_HEADER[@]}" "$API_URL" | jq -r '.body // "*No release notes found on the upstream repository.*"')
-log "\n$UPSTREAM_NOTES\n"
+_notes_hdr=()
+if [ -n "${GITHUB_TOKEN-}" ]; then _notes_hdr=(-H "Authorization: Bearer ${GITHUB_TOKEN}"); fi
+case "$DEF_PATCHES_VER" in
+    latest) _notes_ep="releases/latest" ;;
+    dev) _notes_ep="releases?per_page=1" ;;
+    *) _notes_ep="releases/tags/${DEF_PATCHES_VER}" ;;
+esac
+UPSTREAM_NOTES=$(curl -fsS --max-time 30 ${_notes_hdr[@]+"${_notes_hdr[@]}"} "https://api.github.com/repos/${DEF_PATCHES_SRC}/${_notes_ep}" 2>/dev/null | jq -r '(if type == "array" then .[0] else . end) | .body // empty' 2>/dev/null | tr -d '\r') || UPSTREAM_NOTES=""
+if [ -n "$UPSTREAM_NOTES" ]; then
+    printf '\n%s\n' "$UPSTREAM_NOTES" >>"build.md"
+else
+    log "\n*No release notes found on the upstream repository.*"
+fi
 
 SKIPPED=$(cat "$TEMP_DIR"/skipped 2>/dev/null || :)
 if [ -n "$SKIPPED" ]; then

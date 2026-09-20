@@ -4,154 +4,517 @@ on:
   schedule:
     - cron: '0 */3 * * *'
   workflow_dispatch:
-    
+  push:
+    branches: [main]
+    paths: ['.github/workflows/sync.yml']
+
 permissions:
   contents: write
+
+concurrency:
+  group: sync-fork
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: j-hc/revanced-magisk-module
+  TARGET_BRANCH: main
+  PATCHES_SRC: MorpheApp/morphe-patches
+  CLI_SRC: MorpheApp/morphe-cli
+  BRAND: Morphe
+  CI_CRON: '0 */1 * * *'
+  SYNC_FILES: 'build.sh utils.sh .github/workflows/build.yml .github/workflows/ci.yml'
+  SYNC_DIRS: 'bin'
+  WATCH_FILES: 'config.toml CONFIG.md'
+  KEEPALIVE_DAYS: '45'
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
+      - name: Check sync token
+        env:
+          SYNC_AUTH: ${{ secrets.SYNC_AUTH }}
+        run: |
+          if [ -z "$SYNC_AUTH" ]; then
+            echo "::error::Secret SYNC_AUTH is missing or empty. Create a personal access token with the 'repo' and 'workflow' scopes and save it as a repository secret named SYNC_AUTH."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
+          ref: ${{ env.TARGET_BRANCH }}
           fetch-depth: 0
           token: ${{ secrets.SYNC_AUTH }}
 
-      - name: Sync upstream files
+      - name: Sync, patch and validate
+        id: sync
         run: |
-          git config user.name "GitHub Action"
-          git config user.email "action@github.com"
-          git remote add upstream https://github.com/j-hc/revanced-magisk-module.git
-          git fetch upstream refs/heads/main:refs/remotes/upstream/main
-          git checkout upstream/main -- build.sh utils.sh .github/workflows/build.yml .github/workflows/ci.yml
-
-      - name: Inject custom code
-        run: |
-          cat << 'EOF' > patch.py
+          python3 - <<'PY'
+          import hashlib
           import os
           import re
+          import subprocess
+          import sys
+          import time
 
-          errors = []
+          E = os.environ.get
+          UPSTREAM_REPO = E("UPSTREAM_REPO") or "j-hc/revanced-magisk-module"
+          UPSTREAM_URL = E("UPSTREAM_URL") or f"https://github.com/{UPSTREAM_REPO}.git"
+          PATCHES_SRC = E("PATCHES_SRC") or "MorpheApp/morphe-patches"
+          CLI_SRC = E("CLI_SRC") or "MorpheApp/morphe-cli"
+          BRAND = E("BRAND") or "Morphe"
+          CI_CRON = E("CI_CRON") or "0 */1 * * *"
+          SYNC_FILES = E("SYNC_FILES", "build.sh utils.sh .github/workflows/build.yml .github/workflows/ci.yml").split()
+          SYNC_DIRS = E("SYNC_DIRS", "bin").split()
+          WATCH_FILES = E("WATCH_FILES", "config.toml CONFIG.md").split()
+          TOKEN_EXPR = "$" "{{ secrets.GITHUB_TOKEN }}"
+          BUILD_YML = ".github/workflows/build.yml"
+          CI_YML = ".github/workflows/ci.yml"
 
-          def replace_in_file(filepath, old_text, new_text):
-              if not os.path.exists(filepath):
-                  return
-              try:
-                  with open(filepath, "r") as f: content = f.read()
-                  if old_text not in content:
-                      msg = f"[WARNING] This part not found {filepath} : '{old_text[:30]}...'"
-                      print(msg)
-                      errors.append(msg)
-                      return
-                  with open(filepath, "w") as f: f.write(content.replace(old_text, new_text))
-              except Exception as e:
-                  msg = f"[ERROR] Failed to patch {filepath}: {e}"
-                  print(msg)
-                  errors.append(msg)
 
-          def regex_replace(filepath, pattern, new_text):
-              if not os.path.exists(filepath):
-                  return
-              try:
-                  with open(filepath, "r") as f: content = f.read()
-                  new_content, count = re.subn(pattern, new_text, content, flags=re.DOTALL)
-                  if count == 0:
-                      msg = f"[WARNING] The regex found nothing in {filepath}. The source code may have changed."
-                      print(msg)
-                      errors.append(msg)
-                      return
-                  with open(filepath, "w") as f: f.write(new_content)
-              except Exception as e:
-                  msg = f"[ERROR] Failed to patch {filepath}: {e}"
-                  print(msg)
-                  errors.append(msg)
+          def sh(*cmd, check=True):
+              r = subprocess.run(cmd, text=True, capture_output=True, stdin=subprocess.DEVNULL)
+              if check and r.returncode != 0:
+                  raise RuntimeError(f"`{' '.join(cmd)}` failed ({r.returncode}): {(r.stderr or r.stdout).strip()}")
+              return r
 
-          replace_in_file("build.sh", 'DEF_PATCHES_SRC="ReVanced/revanced-patches"', 'DEF_PATCHES_SRC="MorpheApp/morphe-patches"')
-          replace_in_file("build.sh", 'DEF_CLI_SRC="ReVanced/revanced-cli"', 'DEF_CLI_SRC="MorpheApp/morphe-cli"')
-          replace_in_file("build.sh", 'DEF_RV_BRAND="ReVanced"', 'DEF_RV_BRAND="Morphe"')
 
-          old_block = '''log "\\nInstall [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs"
-          log "Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music modules from Play Store"
-          log "\\n[revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)\\n"
-          log "$(cat "$TEMP_DIR"/*/changelog.md)"'''
+          def git(*args, check=True):
+              return sh("git", *args, check=check).stdout.strip()
 
-          new_block = '''log "$(cat "$TEMP_DIR"/*/changelog.md)"
-          log "For YT Music, you can use [ArchiveTune](https://github.com/rukamori/ArchiveTune)."
 
-          AUTH_HEADER=(${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"})
-          API_URL="https://api.github.com/repos/$DEF_PATCHES_SRC/releases/$([ "$DEF_PATCHES_VER" = "latest" ] && echo "latest" || echo "tags/$DEF_PATCHES_VER")"
-          UPSTREAM_NOTES=$(curl -s "${AUTH_HEADER[@]}" "$API_URL" | jq -r '.body // "*No release notes found on the upstream repository.*"')
-          log "\\n$UPSTREAM_NOTES\\n"'''
+          def read(path):
+              with open(path, newline="") as f:
+                  return f.read()
 
-          replace_in_file("build.sh", old_block, new_block)
-          regex_replace("build.sh", r"mkdir -p \$\{MODULE_TEMPLATE_DIR\}/bin/arm64.*?cmpr-x86_64\"", r"")
-          regex_replace("build.sh", r"ENABLE_MODULE_UPDATE=\$\(toml_get.*?ENABLE_MODULE_UPDATE=false\nfi", r"")
 
-          replace_in_file(".github/workflows/build.yml",
-              '        if: ${{ inputs.from_ci }}\n        run: |\n          if git checkout origin/update build.md; then',
-              '        if: ${{ inputs.from_ci }}\n        env:\n          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n        run: |\n          gh release view -R $GITHUB_REPOSITORY --json body -q .body > build.md 2>/dev/null || > build.md\n          if [ -s build.md ]; then')
+          def write(path, text):
+              with open(path, "w", newline="") as f:
+                  f.write(text)
 
-          replace_in_file(".github/workflows/build.yml", 'Build modules/APKs', 'Build Morphe')
-          replace_in_file(".github/workflows/build.yml", 'release_name: ReVanced', 'release_name: Morphe')
-          regex_replace(".github/workflows/build.yml", r"\s*- name: Report to Telegram.*?(?=\n\s*- name: |\Z)", r"")
 
-          replace_in_file(".github/workflows/build.yml",
-              'echo "${DELIM}" >> "$GITHUB_OUTPUT"\n          cp -f build.md build.tmp\n      \n      - name: Upload release',
-              'echo "${DELIM}" >> "$GITHUB_OUTPUT"\n\n      - name: Upload release')
+          def short(sha):
+              return sha[:7] if sha else "none"
 
-          replace_in_file(".github/workflows/build.yml",
-              '      - name: Update modules changelog and update json\n        id: update_config\n        run: |\n          git checkout -f update || git switch --discard-changes --orphan update\n          cp -f build.tmp build.md\n          get_update_json() {',
-              '      - name: Update modules changelog and update json\n        id: update_config\n        run: |\n          get_update_json() {')
 
-          replace_in_file(".github/workflows/build.yml",
-              '\\"changelog\\": \\"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/update/build.md\\"',
-              '\\"changelog\\": \\"https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/build.md\\"')
+          def fetch_upstream():
+              if sh("git", "remote", "get-url", "upstream", check=False).returncode == 0:
+                  git("remote", "set-url", "upstream", UPSTREAM_URL)
+              else:
+                  git("remote", "add", "upstream", UPSTREAM_URL)
+              m = re.search(r"ref: refs/heads/(\S+)\s+HEAD", sh("git", "ls-remote", "--symref", "upstream", "HEAD", check=False).stdout)
+              branch = m.group(1) if m else "main"
+              for attempt in range(1, 4):
+                  try:
+                      git("fetch", "--no-tags", "upstream", f"+refs/heads/{branch}:refs/remotes/upstream/{branch}")
+                      return branch
+                  except RuntimeError:
+                      if attempt == 3:
+                          raise
+                      time.sleep(5 * attempt)
 
-          replace_in_file(".github/workflows/build.yml", 'git push origin HEAD:update', 'git push origin HEAD:main')
 
-          replace_in_file(".github/workflows/ci.yml", '- cron: "0 16 * * *"', '- cron: "0 */1 * * *"')
-          regex_replace(".github/workflows/ci.yml",
-                        r"if ! git checkout origin/update build\.md; then.*?fi\n\s*fi",
-                        r"""gh release view -R $GITHUB_REPOSITORY --json body -q .body > build.md 2>/dev/null || > build.md
-                    if [ ! -s build.md ]; then
-                      echo "first time building!"
-                      echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
-                    else
-                      UPDATE_CFG=$(./build.sh config.toml --config-update)
-                      if [ "$UPDATE_CFG" ]; then
-                        echo "'$UPDATE_CFG'"
-                        echo "SHOULD_BUILD=1" >> $GITHUB_OUTPUT
-                      else
-                        echo "SHOULD_BUILD=0" >> $GITHUB_OUTPUT
-                      fi
-                    fi""")
+          def last_synced_commit():
+              for body in git("log", "-n", "200", "--format=%B%x00").split("\x00"):
+                  m = re.search(r"^Upstream-Commit: ([0-9a-f]{40})\s*$", body, re.M)
+                  if m:
+                      sha = m.group(1)
+                      if sh("git", "cat-file", "-e", f"{sha}^{{commit}}", check=False).returncode == 0:
+                          return sha
+              return None
 
-          regex_replace("utils.sh", r'if \[ "\$mode_arg" = module \]; then.*?fi', 'build_mode_arr=(apk)')
 
-          regex_replace("utils.sh", r'\s*local base_template.*?pr "Built \$\{table\} \(root\): \'\$\{BUILD_DIR\}/\$\{module_output\}\'"', '')
+          SOURCE_RE = re.compile(r"""^[ \t]*(?:source|\.)[ \t]+["']?(?:\./)?([A-Za-z0-9_][A-Za-z0-9_./-]*\.sh)["']?""", re.M)
 
-          regex_replace("utils.sh", r"module_config\(\) \{.*?module_prop\(\) \{.*?\n\}", r"")
 
-          if errors:
-              print(f"\n{len(errors)} patch operation(s) failed or matched nothing (often normal if already applied).")
+          def collect_files(ref, tree, problems):
+              files = []
+              for f in SYNC_FILES:
+                  if f in tree:
+                      files.append(f)
+                  else:
+                      problems.append(f"`{f}` no longer exists upstream (renamed or removed). The sync rules must be updated.")
+              for d in SYNC_DIRS:
+                  if any(p.startswith(d + "/") for p in tree):
+                      files.append(d)
+              followed = []
+              queue = [f for f in files if f.endswith(".sh")]
+              while queue:
+                  current = queue.pop()
+                  for m in SOURCE_RE.finditer(sh("git", "show", f"{ref}:{current}").stdout):
+                      path = m.group(1)
+                      if path in tree and path not in files:
+                          files.append(path)
+                          followed.append(path)
+                          if path.endswith(".sh"):
+                              queue.append(path)
+              return files, followed
 
-          EOF
-          
-          python3 patch.py
-          rm patch.py
 
-      - name: Commit and push
-        run: |
-          git add -A
-          
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git commit -m "chore: apply custom patches"
-          fi
-          
-          if [[ $(git rev-parse HEAD) != $(git rev-parse origin/main) ]]; then
-            git push origin main
-            echo "Updates successfully synchronized and dispatched."
+          def set_default(var, value):
+              pattern = re.compile(r"(\|\|\s*" + re.escape(var) + r'=)"[^"\n]*"')
+
+              def fn(text):
+                  new, n = pattern.subn(lambda m: m.group(1) + '"' + value + '"', text)
+                  return (new, f"{var}={value}") if n else None
+
+              return fn
+
+
+          CMPR_LINES = re.compile(r"^(?=[^\n]*MODULE_TEMPLATE_DIR)(?=[^\n]*(?:cmpr|mkdir -p))[^\n]*\n", re.M)
+
+
+          def drop_module_downloads(text):
+              new, n = CMPR_LINES.subn("", text)
+              return (new, f"{n} line(s) removed") if n else None
+
+
+          PROMO_LINES = re.compile(r'^[ \t]*log "[^\n]*(?:MicroG-RE|zygisk-detach|revanced-magisk-module)[^\n]*"[ \t]*\n', re.M)
+          CHANGELOG_ANCHOR = re.compile(r'^[ \t]*log "\$\(cat "\$TEMP_DIR"/\*/changelog\.md\)"[ \t]*\n', re.M)
+          NOTES_SNIPPET = r'''log "For YT Music, you can use [ArchiveTune](https://github.com/rukamori/ArchiveTune)."
+
+          _notes_hdr=()
+          if [ -n "${GITHUB_TOKEN-}" ]; then _notes_hdr=(-H "Authorization: Bearer ${GITHUB_TOKEN}"); fi
+          case "$DEF_PATCHES_VER" in
+              latest) _notes_ep="releases/latest" ;;
+              dev) _notes_ep="releases?per_page=1" ;;
+              *) _notes_ep="releases/tags/${DEF_PATCHES_VER}" ;;
+          esac
+          UPSTREAM_NOTES=$(curl -fsS --max-time 30 ${_notes_hdr[@]+"${_notes_hdr[@]}"} "https://api.github.com/repos/${DEF_PATCHES_SRC}/${_notes_ep}" 2>/dev/null | jq -r '(if type == "array" then .[0] else . end) | .body // empty' 2>/dev/null | tr -d '\r') || UPSTREAM_NOTES=""
+          if [ -n "$UPSTREAM_NOTES" ]; then
+              printf '\n%s\n' "$UPSTREAM_NOTES" >>"build.md"
           else
-            echo "No changes to commit, the repository is already up to date."
+              log "\n*No release notes found on the upstream repository.*"
           fi
+          '''
+
+
+          def changelog(text):
+              if not CHANGELOG_ANCHOR.search(text):
+                  return None
+              text = PROMO_LINES.sub("", text)
+              m = CHANGELOG_ANCHOR.search(text)
+              return text[: m.end()] + NOTES_SNIPPET + text[m.end():], "promo lines replaced by patches release notes"
+
+
+          MODE_LINE = re.compile(r"^([ \t]*)local mode_arg=[^\n]*\n", re.M)
+
+
+          def force_apk_mode(text):
+              m = MODE_LINE.search(text)
+              if not m:
+                  return None
+              return text[: m.end()] + f"{m.group(1)}mode_arg=apk\n" + text[m.end():], "mode_arg forced to apk"
+
+
+          UPDATE_COND = re.compile(r"^([ \t]*)if (!\s*)?git checkout origin/update build\.md; then[ \t]*$", re.M)
+
+
+          def use_release_body(text):
+              def rep(m):
+                  ind = m.group(1)
+                  neg = "! " if m.group(2) else ""
+                  return (
+                      f'{ind}export GITHUB_TOKEN="{TOKEN_EXPR}"\n'
+                      f'{ind}gh release view -R "$GITHUB_REPOSITORY" --json body -q .body >build.md 2>/dev/null || : >build.md\n'
+                      f"{ind}if {neg}[ -s build.md ]; then"
+                  )
+
+              new, n = UPDATE_COND.subn(rep, text)
+              return (new, f"{n} occurrence(s)") if n else None
+
+
+          def set_cron(text):
+              new, n = re.subn(r"""(cron:\s*)(["'])[^"'\n]*\2""", lambda m: m.group(1) + '"' + CI_CRON + '"', text)
+              return (new, f"cron={CI_CRON}") if n else None
+
+
+          def relabel(text):
+              if "Build modules/APKs" not in text:
+                  return None
+              return text.replace("Build modules/APKs", "Build " + BRAND), "label renamed"
+
+
+          def step_ranges(lines):
+              ranges = []
+              i = 0
+              while i < len(lines):
+                  m = re.match(r"^(\s*)steps:\s*$", lines[i])
+                  if not m:
+                      i += 1
+                      continue
+                  base = len(m.group(1))
+                  j = i + 1
+                  while j < len(lines) and not lines[j].strip():
+                      j += 1
+                  if j >= len(lines):
+                      break
+                  dash = len(lines[j]) - len(lines[j].lstrip())
+                  if dash <= base or not lines[j].lstrip().startswith("- "):
+                      i += 1
+                      continue
+                  starts = []
+                  k = j
+                  while k < len(lines):
+                      line = lines[k]
+                      if line.strip():
+                          indent = len(line) - len(line.lstrip())
+                          if indent < dash:
+                              break
+                          if indent == dash and line.lstrip().startswith("- "):
+                              starts.append(k)
+                      k += 1
+                  for a, s in enumerate(starts):
+                      ranges.append((s, starts[a + 1] if a + 1 < len(starts) else k))
+                  i = k
+              return ranges
+
+
+          DROP_NAME = re.compile(r"^\s*(?:-\s*)?name:.*(?:Update modules changelog|Commit module json|Report to Telegram)", re.M | re.I)
+          DROP_BODY = re.compile(r"HEAD:update|checkout -f update|--orphan update|/update/build\.md|api\.telegram\.org|\bTG_TOKEN\b")
+
+
+          def drop_unused_steps(text):
+              lines = text.split("\n")
+              doomed = [(s, e) for s, e in step_ranges(lines) if DROP_NAME.search("\n".join(lines[s:e])) or DROP_BODY.search("\n".join(lines[s:e]))]
+              if not doomed:
+                  return text, "nothing to remove"
+              names = []
+              for s, e in reversed(doomed):
+                  m = re.search(r"name:\s*(.+)", "\n".join(lines[s:e]))
+                  names.append(m.group(1).strip() if m else "unnamed step")
+                  del lines[s:e]
+              new = "\n".join(lines).rstrip("\n") + "\n"
+              return new, "removed: " + ", ".join(reversed(names))
+
+
+          PATCHES = [
+              ("Default patches source", "build.sh", set_default("DEF_PATCHES_SRC", PATCHES_SRC), True),
+              ("Default CLI source", "build.sh", set_default("DEF_CLI_SRC", CLI_SRC), True),
+              ("Default brand", "build.sh", set_default("DEF_RV_BRAND", BRAND), True),
+              ("Skip module-only downloads", "build.sh", drop_module_downloads, False),
+              ("Changelog links and patches release notes", "build.sh", changelog, False),
+              ("Force APK-only mode", "utils.sh", force_apk_mode, False),
+              ("CI: last build read from latest release", CI_YML, use_release_body, True),
+              ("CI: schedule", CI_YML, set_cron, False),
+              ("Build: last build read from latest release", BUILD_YML, use_release_body, False),
+              ("Build: drop update-branch and Telegram steps", BUILD_YML, drop_unused_steps, False),
+              ("Build: step label", BUILD_YML, relabel, False),
+          ]
+
+
+          def apply_patches(problems, warnings):
+              results = []
+              for label, path, fn, critical in PATCHES:
+                  if not os.path.exists(path):
+                      status, detail = "MISSING", "file not found"
+                  else:
+                      original = read(path)
+                      out = fn(original)
+                      if out is None:
+                          status, detail = "MISSING", "pattern not found, upstream changed"
+                      else:
+                          new, detail = out
+                          if new != original:
+                              write(path, new)
+                          status = "ok"
+                  results.append((label, path, status, detail, critical))
+                  if status == "MISSING":
+                      (problems if critical else warnings).append(f"Patch '{label}' ({path}): {detail}.")
+              return results
+
+
+          UPDATE_BRANCH_REFS = re.compile(r"origin/update|HEAD:update|checkout -f update|--orphan update|/update/build\.md")
+
+
+          def validate(files, problems, warnings):
+              for f in [f for f in files if f.endswith(".sh")]:
+                  r = sh("bash", "-n", f, check=False)
+                  if r.returncode != 0:
+                      problems.append(f"Shell syntax error in `{f}` after patching: {r.stderr.strip()}")
+
+              workflows = [f for f in (CI_YML, BUILD_YML) if os.path.exists(f)]
+              try:
+                  import yaml
+              except ImportError:
+                  sh(sys.executable, "-m", "pip", "install", "--quiet", "--break-system-packages", "pyyaml", check=False)
+                  try:
+                      import yaml
+                  except ImportError:
+                      yaml = None
+                      warnings.append("PyYAML not available: YAML syntax check skipped.")
+              for f in workflows:
+                  text = read(f)
+                  if yaml is not None:
+                      try:
+                          data = yaml.safe_load(text)
+                          if not isinstance(data, dict) or "jobs" not in data:
+                              problems.append(f"`{f}` has no jobs after patching.")
+                      except Exception as exc:
+                          problems.append(f"`{f}` is not valid YAML after patching: {str(exc).splitlines()[0]}")
+                  if UPDATE_BRANCH_REFS.search(text):
+                      problems.append(f"`{f}` still refers to the `update` branch.")
+                  ids = set(re.findall(r"^\s*(?:-\s*)?id:\s*([A-Za-z0-9_-]+)\s*$", text, re.M))
+                  refs = set(re.findall(r"\bsteps\.([A-Za-z0-9_-]+)\.", text))
+                  for missing in sorted(refs - ids):
+                      problems.append(f"`{f}` uses the output of step `{missing}`, which no longer exists.")
+
+              if os.path.exists(BUILD_YML) and "gh release create" not in read(BUILD_YML):
+                  problems.append("`build.yml` no longer creates GitHub releases (`gh release create` not found).")
+
+              if os.path.exists("build.sh"):
+                  text = read("build.sh")
+                  for label, value in (("patches source", PATCHES_SRC), ("CLI source", CLI_SRC), ("brand", BRAND)):
+                      if f'"{value}"' not in text:
+                          problems.append(f"`build.sh` does not use the expected {label} `{value}`.")
+
+              for f in ("build.sh", "utils.sh"):
+                  if os.path.exists(f):
+                      for line in read(f).splitlines():
+                          if re.search(r"ReVanced/revanced-(patches|cli)", line) and not line.lstrip().startswith("#"):
+                              warnings.append(f"`{f}` still mentions an original ReVanced source: `{line.strip()[:100]}`")
+
+              changed = set(git("diff", "--name-only", "HEAD").splitlines()) | set(git("ls-files", "--others", "--exclude-standard").splitlines())
+              for path in sorted(changed):
+                  if not any(path == f or path.startswith(f + "/") for f in files):
+                      problems.append(f"Unexpected change outside the synced files: `{path}`.")
+
+
+          def upstream_changes(old, new, paths):
+              if not old:
+                  return None
+              if old == new:
+                  return "Upstream has not changed since the last sync."
+              stat = git("diff", "--stat", old, new, "--", *paths, check=False)
+              commits = git("log", "--oneline", "--no-merges", "-n", "25", f"{old}..{new}", "--", *paths, check=False)
+              if not stat and not commits:
+                  return "Upstream moved, but none of the synced or watched files changed."
+              return f"Commits touching synced or watched files:\n{commits}\n\nFiles:\n{stat}"
+
+
+          def main():
+              problems, warnings = [], []
+              branch = fetch_upstream()
+              ref = f"upstream/{branch}"
+              new_sha = git("rev-parse", ref)
+              old_sha = last_synced_commit()
+              tree = set(git("ls-tree", "-r", "--name-only", ref).splitlines())
+
+              files, followed = collect_files(ref, tree, problems)
+              changes = upstream_changes(old_sha, new_sha, files + [w for w in WATCH_FILES if w in tree])
+              watched_changed = []
+              if old_sha and old_sha != new_sha:
+                  for w in WATCH_FILES:
+                      if w in tree and git("diff", "--name-only", old_sha, new_sha, "--", w, check=False):
+                          watched_changed.append(w)
+
+              results = []
+              if not problems:
+                  git("checkout", ref, "--", *files)
+                  results = apply_patches(problems, warnings)
+                  validate(files, problems, warnings)
+
+              if followed:
+                  warnings.append("Additional scripts now sourced by upstream were synced automatically: " + ", ".join(followed))
+              for w in watched_changed:
+                  warnings.append(f"Upstream changed `{w}`. Review your own config.toml if a build starts failing.")
+
+              blocked = bool(problems)
+              if blocked:
+                  sh("git", "reset", "--hard", "HEAD", check=False)
+
+              lines = [f"## Sync with {UPSTREAM_REPO}@{branch}", "", f"Upstream commit: `{short(new_sha)}` (previous sync: `{short(old_sha)}`)", ""]
+              lines.append("**Result: BLOCKED, nothing was pushed, the repository keeps its last working version.**" if blocked else "**Result: OK**")
+              if problems:
+                  lines += ["", "### Problems", *[f"- {p}" for p in problems]]
+              if warnings:
+                  lines += ["", "### Warnings", *[f"- {w}" for w in warnings]]
+              if results:
+                  lines += ["", "### Patches", "", "| Patch | File | Status | Detail |", "|---|---|---|---|"]
+                  for label, path, status, detail, critical in results:
+                      lines.append(f"| {label}{' (required)' if critical else ''} | `{path}` | {status} | {detail} |")
+              if changes:
+                  lines += ["", "### Upstream changes since last sync", "```", changes[:6000], "```"]
+              if blocked:
+                  if old_sha:
+                      diff = git("diff", old_sha, new_sha, "--", *[f for f in files if f not in SYNC_DIRS], check=False)
+                      if diff:
+                          lines += ["", "### Upstream diff of the synced files", "```diff", diff[:25000], "```"]
+                  lines += ["", "### How to fix", "Copy this whole summary into Claude and ask it to update the patch rules in `.github/workflows/sync.yml`."]
+              summary = "\n".join(lines) + "\n"
+              print(summary)
+              if E("GITHUB_STEP_SUMMARY"):
+                  with open(E("GITHUB_STEP_SUMMARY"), "a") as f:
+                      f.write(summary)
+
+              blob_ids = [sh("git", "rev-parse", "--verify", "-q", f"{ref}:{f}", check=False).stdout.strip() for f in files]
+              block_key = hashlib.sha1(("\n".join(problems) + "".join(blob_ids)).encode()).hexdigest()[:8]
+              if E("GITHUB_OUTPUT"):
+                  with open(E("GITHUB_OUTPUT"), "a") as f:
+                      f.write(f"blocked={'true' if blocked else 'false'}\nupstream_sha={new_sha}\nupstream_short={short(new_sha)}\nblock_key={block_key}\n")
+
+
+          main()
+          PY
+
+      - name: Publish
+        if: steps.sync.outputs.blocked != 'true'
+        env:
+          UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
+          UPSTREAM_SHORT: ${{ steps.sync.outputs.upstream_short }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -q -m "chore: sync with upstream (${UPSTREAM_SHORT})" -m "Upstream-Commit: ${UPSTREAM_SHA}"
+          else
+            echo "Already up to date with upstream."
+            age_days=$(( ($(date +%s) - $(git log -1 --format=%ct)) / 86400 ))
+            if [ "$age_days" -ge "$KEEPALIVE_DAYS" ]; then
+              git commit -q --allow-empty -m "chore: keepalive (GitHub pauses scheduled workflows after 60 days without activity)"
+            fi
+          fi
+
+          if [ "$(git rev-list --count "origin/${TARGET_BRANCH}..HEAD")" = "0" ]; then
+            echo "Nothing to push."
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:refs/heads/${TARGET_BRANCH}"; then
+              echo "Changes pushed to ${TARGET_BRANCH}."
+              exit 0
+            fi
+            echo "Push rejected (attempt ${attempt}), rebasing on the latest remote state."
+            git pull --rebase --quiet origin "${TARGET_BRANCH}"
+          done
+          echo "::error::Could not push after 3 attempts."
+          exit 1
+
+      - name: Clear blocked markers
+        if: steps.sync.outputs.blocked != 'true'
+        run: |
+          set -uo pipefail
+          git ls-remote --tags origin 'refs/tags/sync-blocked-*' | awk '{print $2}' | while read -r ref; do
+            git push origin --delete "$ref" || true
+          done
+          exit 0
+
+      - name: Report blocked sync
+        if: steps.sync.outputs.blocked == 'true'
+        env:
+          BLOCK_KEY: ${{ steps.sync.outputs.block_key }}
+        run: |
+          set -uo pipefail
+          tag="sync-blocked-${BLOCK_KEY}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "::warning::Sync is still blocked by the same upstream change (already reported). Nothing was pushed. Details are in the job summary."
+            exit 0
+          fi
+          git tag "$tag" HEAD && git push origin "refs/tags/${tag}" || echo "::warning::Could not record the blocked state, you may be notified again on the next run."
+          echo "::error::Sync blocked by an upstream change. Nothing was pushed, the repository keeps its last working version. Open the job summary for details."
+          exit 1

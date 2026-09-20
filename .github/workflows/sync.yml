@@ -23,8 +23,9 @@ env:
   BRAND: Morphe
   CI_CRON: '0 */1 * * *'
   SYNC_FILES: 'build.sh utils.sh .github/workflows/build.yml .github/workflows/ci.yml'
+  SYNC_EXTRA: 'ks.keystore ks-p12.keystore sig.txt LICENSE .gitignore'
   SYNC_DIRS: 'bin'
-  WATCH_FILES: 'config.toml CONFIG.md'
+  WATCH_FILES: ''
   KEEPALIVE_DAYS: '45'
 
 jobs:
@@ -67,6 +68,7 @@ jobs:
           BRAND = E("BRAND") or "Morphe"
           CI_CRON = E("CI_CRON") or "0 */1 * * *"
           SYNC_FILES = E("SYNC_FILES", "build.sh utils.sh .github/workflows/build.yml .github/workflows/ci.yml").split()
+          SYNC_EXTRA = E("SYNC_EXTRA", "ks.keystore ks-p12.keystore sig.txt LICENSE .gitignore").split()
           SYNC_DIRS = E("SYNC_DIRS", "bin").split()
           WATCH_FILES = E("WATCH_FILES", "config.toml CONFIG.md").split()
           TOKEN_EXPR = "$" "{{ secrets.GITHUB_TOKEN }}"
@@ -129,16 +131,23 @@ jobs:
           SOURCE_RE = re.compile(r"""^[ \t]*(?:source|\.)[ \t]+["']?(?:\./)?([A-Za-z0-9_][A-Za-z0-9_./-]*\.sh)["']?""", re.M)
 
 
-          def collect_files(ref, tree, problems):
+          def collect_files(ref, tree, problems, warnings):
               files = []
               for f in SYNC_FILES:
                   if f in tree:
                       files.append(f)
                   else:
                       problems.append(f"`{f}` no longer exists upstream (renamed or removed). The sync rules must be updated.")
+              for f in SYNC_EXTRA:
+                  if f in tree:
+                      files.append(f)
+                  else:
+                      warnings.append(f"`{f}` no longer exists upstream, your copy was left untouched.")
               for d in SYNC_DIRS:
                   if any(p.startswith(d + "/") for p in tree):
                       files.append(d)
+                  else:
+                      problems.append(f"Directory `{d}` no longer exists upstream (moved or renamed). The sync rules must be updated.")
               followed = []
               queue = [f for f in files if f.endswith(".sh")]
               while queue:
@@ -151,6 +160,20 @@ jobs:
                           if path.endswith(".sh"):
                               queue.append(path)
               return files, followed
+
+
+          def mirror_dirs(tree, files):
+              removed = []
+              for d in SYNC_DIRS:
+                  if d not in files:
+                      continue
+                  keep = {p for p in tree if p.startswith(d + "/")}
+                  local = [p for p in sh("git", "ls-files", "-z", "--", d).stdout.split("\0") if p]
+                  stale = [p for p in local if p not in keep]
+                  if stale:
+                      git("rm", "-q", "--", *stale)
+                      removed += stale
+              return removed
 
 
           def set_default(var, value):
@@ -395,14 +418,14 @@ jobs:
 
 
           def main():
-              problems, warnings = [], []
+              problems, warnings, removed = [], [], []
               branch = fetch_upstream()
               ref = f"upstream/{branch}"
               new_sha = git("rev-parse", ref)
               old_sha = last_synced_commit()
               tree = set(git("ls-tree", "-r", "--name-only", ref).splitlines())
 
-              files, followed = collect_files(ref, tree, problems)
+              files, followed = collect_files(ref, tree, problems, warnings)
               changes = upstream_changes(old_sha, new_sha, files + [w for w in WATCH_FILES if w in tree])
               watched_changed = []
               if old_sha and old_sha != new_sha:
@@ -413,6 +436,7 @@ jobs:
               results = []
               if not problems:
                   git("checkout", ref, "--", *files)
+                  removed = mirror_dirs(tree, files)
                   results = apply_patches(problems, warnings)
                   validate(files, problems, warnings)
 
@@ -431,6 +455,8 @@ jobs:
                   lines += ["", "### Problems", *[f"- {p}" for p in problems]]
               if warnings:
                   lines += ["", "### Warnings", *[f"- {w}" for w in warnings]]
+              if removed:
+                  lines += ["", "### Removed (no longer in upstream)", *[f"- `{p}`" for p in removed]]
               if results:
                   lines += ["", "### Patches", "", "| Patch | File | Status | Detail |", "|---|---|---|---|"]
                   for label, path, status, detail, critical in results:

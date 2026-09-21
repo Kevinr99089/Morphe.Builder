@@ -27,6 +27,7 @@ env:
   SYNC_DIRS: 'bin'
   WATCH_FILES: ''
   KEEPALIVE_DAYS: '45'
+  TRACK_UPSTREAM: 'true'
 
 jobs:
   sync:
@@ -119,7 +120,7 @@ jobs:
 
 
           def last_synced_commit():
-              for body in git("log", "-n", "200", "--format=%B%x00").split("\x00"):
+              for body in git("log", "--first-parent", "-n", "200", "--format=%B%x00").split("\x00"):
                   m = re.search(r"^Upstream-Commit: ([0-9a-f]{40})\s*$", body, re.M)
                   if m:
                       sha = m.group(1)
@@ -496,29 +497,42 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add -A
-          if [ -n "$(git status --porcelain)" ]; then
-            git commit -q -m "chore: sync with upstream (${UPSTREAM_SHORT})" -m "Upstream-Commit: ${UPSTREAM_SHA}"
-          else
-            echo "Already up to date with upstream."
-            age_days=$(( ($(date +%s) - $(git log -1 --format=%ct)) / 86400 ))
-            if [ "$age_days" -ge "$KEEPALIVE_DAYS" ]; then
-              git commit -q --allow-empty -m "chore: keepalive (GitHub pauses scheduled workflows after 60 days without activity)"
-            fi
+          head_sha=$(git rev-parse HEAD)
+          head_tree=$(git rev-parse 'HEAD^{tree}')
+          new_tree=$(git write-tree)
+          age_days=$(( ($(date +%s) - $(git log -1 --format=%ct)) / 86400 ))
+
+          parents=(-p "$head_sha")
+          record_upstream=false
+          if [ "$TRACK_UPSTREAM" = "true" ] && ! git merge-base --is-ancestor "$UPSTREAM_SHA" "$head_sha"; then
+            parents+=(-p "$UPSTREAM_SHA")
+            record_upstream=true
           fi
 
-          if [ "$(git rev-list --count "origin/${TARGET_BRANCH}..HEAD")" = "0" ]; then
-            echo "Nothing to push."
+          if [ "$new_tree" != "$head_tree" ]; then
+            subject="chore: sync with upstream (${UPSTREAM_SHORT})"
+          elif [ "$record_upstream" = "true" ]; then
+            subject="chore: track upstream (${UPSTREAM_SHORT}), no file changes"
+          elif [ "$age_days" -ge "$KEEPALIVE_DAYS" ]; then
+            subject="chore: keepalive (GitHub pauses scheduled workflows after 60 days without activity)"
+          else
+            echo "Already up to date with upstream."
             exit 0
           fi
-          for attempt in 1 2 3; do
-            if git push origin "HEAD:refs/heads/${TARGET_BRANCH}"; then
-              echo "Changes pushed to ${TARGET_BRANCH}."
-              exit 0
-            fi
-            echo "Push rejected (attempt ${attempt}), rebasing on the latest remote state."
-            git pull --rebase --quiet origin "${TARGET_BRANCH}"
-          done
-          echo "::error::Could not push after 3 attempts."
+
+          new_commit=$(git commit-tree "$new_tree" "${parents[@]}" -m "$subject" -m "Upstream-Commit: ${UPSTREAM_SHA}")
+          git reset -q --soft "$new_commit"
+
+          if git push origin "HEAD:refs/heads/${TARGET_BRANCH}"; then
+            echo "Pushed to ${TARGET_BRANCH}: ${subject}"
+            exit 0
+          fi
+          remote_sha=$(git ls-remote origin "refs/heads/${TARGET_BRANCH}" | cut -f1)
+          if [ "$remote_sha" != "$head_sha" ]; then
+            echo "::warning::${TARGET_BRANCH} changed during this run. Nothing was overwritten, the next run will retry."
+            exit 0
+          fi
+          echo "::error::Push to ${TARGET_BRANCH} failed."
           exit 1
 
       - name: Clear blocked markers

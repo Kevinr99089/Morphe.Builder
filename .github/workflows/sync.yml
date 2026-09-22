@@ -255,6 +255,14 @@ jobs:
               return (new, f"cron={CI_CRON}") if n else None
 
 
+          RELEASE_TITLE = re.compile(r'--title "Release"')
+
+
+          def release_title(text):
+              new, n = RELEASE_TITLE.subn(f'--title "{BRAND}"', text)
+              return (new, f'title="{BRAND}"') if n else None
+
+
           def relabel(text):
               if "Build modules/APKs" not in text:
                   return None
@@ -326,6 +334,7 @@ jobs:
               ("Build: last build read from latest release", BUILD_YML, use_release_body, False),
               ("Build: drop update-branch and Telegram steps", BUILD_YML, drop_unused_steps, False),
               ("Build: step label", BUILD_YML, relabel, False),
+              ("Build: release title", BUILD_YML, release_title, False),
           ]
 
 

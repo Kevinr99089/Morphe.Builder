@@ -21,7 +21,7 @@ env:
   PATCHES_SRC: MorpheApp/morphe-patches
   CLI_SRC: MorpheApp/morphe-cli
   BRAND: Morphe
-  CI_CRON: '23 * * * *'
+  CI_CRON: '23 */1 * * *'
   SYNC_FILES: 'build.sh utils.sh .github/workflows/build.yml .github/workflows/ci.yml'
   SYNC_EXTRA: 'ks.keystore ks-p12.keystore sig.txt LICENSE .gitignore'
   SYNC_DIRS: 'bin'

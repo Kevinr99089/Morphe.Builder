@@ -2,7 +2,7 @@ name: Sync Fork
 
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '0 * 31 2 *'
   workflow_dispatch:
   push:
     branches: [main]
@@ -21,7 +21,7 @@ env:
   PATCHES_SRC: MorpheApp/morphe-patches
   CLI_SRC: MorpheApp/morphe-cli
   BRAND: Morphe
-  CI_CRON: '0 */1 * * *'
+  CI_CRON: '0 * 31 2 *'
   SYNC_FILES: 'build.sh utils.sh .github/workflows/build.yml .github/workflows/ci.yml'
   SYNC_EXTRA: 'ks.keystore ks-p12.keystore sig.txt LICENSE .gitignore'
   SYNC_DIRS: 'bin'
@@ -67,7 +67,7 @@ jobs:
           PATCHES_SRC = E("PATCHES_SRC") or "MorpheApp/morphe-patches"
           CLI_SRC = E("CLI_SRC") or "MorpheApp/morphe-cli"
           BRAND = E("BRAND") or "Morphe"
-          CI_CRON = E("CI_CRON") or "0 * * * *"
+          CI_CRON = E("CI_CRON") or "0 * 31 2 *"
           SYNC_FILES = E("SYNC_FILES", "build.sh utils.sh .github/workflows/build.yml .github/workflows/ci.yml").split()
           SYNC_EXTRA = E("SYNC_EXTRA", "ks.keystore ks-p12.keystore sig.txt LICENSE .gitignore").split()
           SYNC_DIRS = E("SYNC_DIRS", "bin").split()

@@ -18,7 +18,7 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.y
 # use [Metrolist](https://github.com/MetrolistGroup/Metrolist/releases/latest),
 # or [ArchiveTune](https://github.com/rukamori/archivetune/releases/latest) instead.
 
-[tiktok]
+[TikTok]
 rv-brand = "Morphe"
 patches-source = "SysAdminDoc/hushfeed"
 archive-dlurl = "https://ia801607.us.archive.org/30/items/tme89-apks/apks/com.zhiliaoapp.musically"

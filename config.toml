@@ -21,4 +21,4 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.y
 [TikTok-hushfeed]
 rv-brand = "Morphe"
 patches-source = "SysAdminDoc/hushfeed"
-apkmirror-dlurl = "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/"
+uptodown-dlurl = "https://tiktok.fr.uptodown.com/android"

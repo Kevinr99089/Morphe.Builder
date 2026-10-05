@@ -1,0 +1,23 @@
+name: clean queue
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  cancel-queued-runs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Annuler tous les workflows en attente
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUNS=$(gh run list --repo ${{ github.repository }} --status queued --json databaseId --jq '.[].databaseId')
+          if [ -n "$RUNS" ]; then
+            echo "$RUNS" | xargs -I {} gh run cancel {} --repo ${{ github.repository }}
+            echo "Queue cleaned successfully."
+          else
+            echo "No workflow in queue."
+          fi

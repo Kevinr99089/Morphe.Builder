@@ -17,3 +17,8 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.y
 # [Music] is no longer available :
 # use [Metrolist](https://github.com/MetrolistGroup/Metrolist/releases/latest),
 # or [ArchiveTune](https://github.com/rukamori/archivetune/releases/latest) instead.
+
+[TikTok-hushfeed]
+rv-brand = "Morphe"
+patches-source = "SysAdminDoc/hushfeed"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/"

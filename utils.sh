@@ -203,7 +203,7 @@ config_update() {
 				last_patches=$(gh_req "$rv_rel/tags/${PATCHES_VER}" -) || continue
 			fi
 			tag_name=$(jq -e -r '.tag_name' <<<"$last_patches") || abort "config_update error: No tag name"
-			if ! last_patches=$(jq -e -r '.assets[] | select(.name | (endswith("asc") or endswith("json")) | not) | .name' <<<"$last_patches"); then
+			if ! last_patches=$(jq -e -r 'first(.assets[] | select(.name | (endswith("asc") or endswith("json")) | not) | .name)' <<<"$last_patches"); then
 				abort "config_update error: '$last_patches'"
 			fi
 			if [ "$last_patches" ]; then

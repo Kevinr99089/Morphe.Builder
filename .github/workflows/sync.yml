@@ -322,6 +322,16 @@ jobs:
               return new, "removed: " + ", ".join(reversed(names))
 
 
+          CONFIG_ASSET_OLD = """'.assets[] | select(.name | (endswith("asc") or endswith("json")) | not) | .name'"""
+          CONFIG_ASSET_NEW = """'first(.assets[] | select(.name | (endswith("asc") or endswith("json")) | not) | .name)'"""
+
+
+          def config_update_first_asset(text):
+              if CONFIG_ASSET_OLD not in text:
+                  return None
+              return text.replace(CONFIG_ASSET_OLD, CONFIG_ASSET_NEW), "first release asset used"
+
+
           PATCHES = [
               ("Default patches source", "build.sh", set_default("DEF_PATCHES_SRC", PATCHES_SRC), True),
               ("Default CLI source", "build.sh", set_default("DEF_CLI_SRC", CLI_SRC), True),
@@ -329,6 +339,7 @@ jobs:
               ("Skip module-only downloads", "build.sh", drop_module_downloads, False),
               ("Changelog links and patches release notes", "build.sh", changelog, False),
               ("Force APK-only mode", "utils.sh", force_apk_mode, False),
+              ("Config update: use first release asset", "utils.sh", config_update_first_asset, False),
               ("CI: last build read from latest release", CI_YML, use_release_body, True),
               ("CI: schedule", CI_YML, set_cron, False),
               ("Build: last build read from latest release", BUILD_YML, use_release_body, False),

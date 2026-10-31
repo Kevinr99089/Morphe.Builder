@@ -18,6 +18,8 @@
 
 - **[MorpheApp](https://github.com/MorpheApp), The successor to Extended from Inotia00, creator of mods for YT and Music.**
 
+- **[SysAdminDoc](https://github.com/SysAdminDoc), Creator of mod for TikTok [Hushfeed](https://github.com/SysAdminDoc/hushfeed), Instagram [HushGram](https://github.com/SysAdminDoc/Hushgram) and others.**
+
 - **[peternmuller](https://github.com/peternmuller), Help and suggestions for this builder.**
 
 ##### <p align="right"> **MorpheApp is owned by MorpheApp, no rights reserved.**

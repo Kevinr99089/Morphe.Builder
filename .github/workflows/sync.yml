@@ -332,6 +332,137 @@ jobs:
               return text.replace(CONFIG_ASSET_OLD, CONFIG_ASSET_NEW), "first release asset used"
 
 
+          APKM_SNIPPET = r'''_apkm_cffi_ready() {
+              local ok="$TEMP_DIR/.cffi_ok" no="$TEMP_DIR/.cffi_no"
+              if [ -f "$ok" ]; then return 0; fi
+              if [ -f "$no" ]; then return 1; fi
+              if command -v python3 >/dev/null 2>&1; then
+                  python3 -c 'import curl_cffi' >/dev/null 2>&1 ||
+                      python3 -m pip install -q --disable-pip-version-check --break-system-packages curl_cffi >/dev/null 2>&1 ||
+                      python3 -m pip install -q --disable-pip-version-check curl_cffi >/dev/null 2>&1 || :
+                  if python3 -c 'import curl_cffi' >/dev/null 2>&1; then
+                      cat >"$TEMP_DIR/cffi_get.py" <<'CFFI_PY'
+          import json
+          import sys
+
+          url, out, jar = sys.argv[1], sys.argv[2], sys.argv[3]
+          try:
+              from curl_cffi import requests
+          except Exception as exc:
+              sys.stderr.write("curl_cffi unavailable: %s\n" % exc)
+              sys.exit(3)
+          try:
+              s = requests.Session(impersonate="chrome")
+              try:
+                  with open(jar) as f:
+                      for k, v in json.load(f).items():
+                          s.cookies.set(k, v, domain="www.apkmirror.com")
+              except Exception:
+                  pass
+              r = s.get(url, headers={"Referer": "https://www.apkmirror.com/"}, timeout=600, allow_redirects=True, stream=True)
+              code = r.status_code
+              if code >= 400:
+                  sys.stderr.write("HTTP %d\n" % code)
+                  sys.exit(1 if code in (403, 408, 425, 429) or code >= 500 else 22)
+              with open(out, "wb") as f:
+                  for chunk in r.iter_content(chunk_size=1 << 20):
+                      f.write(chunk)
+              try:
+                  with open(jar, "w") as f:
+                      json.dump(s.cookies.get_dict(), f)
+              except Exception:
+                  pass
+          except SystemExit:
+              raise
+          except (TypeError, AttributeError, NotImplementedError) as exc:
+              sys.stderr.write("curl_cffi API error: %s\n" % exc)
+              sys.exit(3)
+          except Exception as exc:
+              sys.stderr.write("%s\n" % exc)
+              sys.exit(1)
+          CFFI_PY
+                      : >"$ok"
+                      return 0
+                  fi
+              fi
+              : >"$no"
+              return 1
+          }
+
+          _apkm_blocked() {
+              grep -qaiE '<title>(just a moment|attention required)' <(head -c 8192 "$1" 2>/dev/null)
+          }
+
+          _apkm_once() {
+              local url="$1" out="$2" code="" rc=0
+              if _apkm_cffi_ready; then
+                  python3 "$TEMP_DIR/cffi_get.py" "$url" "$out" "$TEMP_DIR/cffi_cookies.json" && rc=0 || rc=$?
+                  if [ "$rc" -ne 3 ]; then
+                      if [ "$rc" -eq 0 ] && _apkm_blocked "$out"; then rc=1; fi
+                      return "$rc"
+                  fi
+              fi
+              code=$(command curl -L -s -S --compressed --http2 --connect-timeout 15 -m 900 \
+                  -c "$TEMP_DIR/cookie.txt" -b "$TEMP_DIR/cookie.txt" \
+                  -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36" \
+                  -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
+                  -H "Accept-Language: en-US,en;q=0.9" \
+                  -H "Referer: https://www.apkmirror.com/" \
+                  -H "Upgrade-Insecure-Requests: 1" \
+                  -H "Sec-Fetch-Dest: document" -H "Sec-Fetch-Mode: navigate" -H "Sec-Fetch-Site: same-origin" \
+                  -o "$out" -w '%{http_code}' "$url") && rc=0 || rc=$?
+              if [ "$rc" -ne 0 ]; then return 1; fi
+              case "$code" in
+              2??) if _apkm_blocked "$out"; then return 1; fi; return 0 ;;
+              403 | 408 | 425 | 429 | 5??) return 1 ;;
+              *) return 22 ;;
+              esac
+          }
+
+          _apkm_fetch() {
+              local url="$1" out="$2" tmpf try rc=0
+              tmpf=$(mktemp "${TEMP_DIR}/apkm.XXXXXX") || return 1
+              for try in 1 2 3; do
+                  _apkm_once "$url" "$tmpf" && rc=0 || rc=$?
+                  if [ "$rc" -eq 0 ]; then
+                      if [ "$out" = - ]; then cat "$tmpf"; rm -f "$tmpf"; else mv -f "$tmpf" "$out"; fi
+                      return 0
+                  fi
+                  if [ "$rc" -eq 22 ]; then break; fi
+                  if [ "$try" -lt 3 ]; then
+                      echo "[!] APKMirror blocked or unreachable (try $try/3), waiting before retry: $url" >&2
+                      sleep $((try * 6 + RANDOM % 6))
+                  fi
+              done
+              rm -f "$tmpf"
+              return 22
+          }
+
+          curl() {
+              local a url="" out="" prev=""
+              for a in "$@"; do
+                  if [ "$prev" = "-o" ]; then out="$a"; fi
+                  case "$a" in
+                  http://*apkmirror.com* | https://*apkmirror.com*) url="$a" ;;
+                  esac
+                  prev="$a"
+              done
+              if [ -z "$url" ] || [ -z "$out" ]; then
+                  command curl "$@" && return 0 || return $?
+              fi
+              _apkm_fetch "$url" "$out"
+          }
+          '''
+
+
+          def apkmirror_antibot(text):
+              if "_apkm_fetch()" in text:
+                  return text, "already present"
+              if text and not text.endswith("\n"):
+                  text += "\n"
+              return text + "\n" + APKM_SNIPPET, "appended at the end of the file, no upstream line touched"
+
+
           PATCHES = [
               ("Default patches source", "build.sh", set_default("DEF_PATCHES_SRC", PATCHES_SRC), True),
               ("Default CLI source", "build.sh", set_default("DEF_CLI_SRC", CLI_SRC), True),
@@ -340,6 +471,7 @@ jobs:
               ("Changelog links and patches release notes", "build.sh", changelog, False),
               ("Force APK-only mode", "utils.sh", force_apk_mode, False),
               ("Config update: use first release asset", "utils.sh", config_update_first_asset, False),
+              ("Anti-bot: browser-grade APKMirror requests", "utils.sh", apkmirror_antibot, False),
               ("CI: last build read from latest release", CI_YML, use_release_body, True),
               ("CI: schedule", CI_YML, set_cron, False),
               ("Build: last build read from latest release", BUILD_YML, use_release_body, False),

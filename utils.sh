@@ -425,7 +425,6 @@ dl_apkmirror() {
 	local resp node app_table apkmname dlurl=""
 	apkmname=$($HTMLQ "h1.marginZero" --text <<<"$__APKMIRROR_RESP__")
 	apkmname="${apkmname,,}" apkmname="${apkmname// /-}" apkmname="${apkmname//[^a-z0-9-]/}"
-	case "$url" in *tik-tok-including-musical-ly) apkmname="tiktok" ;; esac
 	url="${url}/${apkmname}-${version//./-}-release/"
 	resp=$(req "$url" -) || return 1
 	node=$($HTMLQ "div.table-row.headerFont:nth-last-child(1)" -r "span:nth-child(n+3)" <<<"$resp")
@@ -441,6 +440,7 @@ dl_apkmirror() {
 		if [ -z "$dlurl" ]; then return 1; fi
 		resp=$(req "$dlurl" -)
 	fi
+	epr "DEBUG apkmirror: release='$url' variant='$dlurl' size=${#resp} title='$($HTMLQ --text title <<<"$resp" | tr -d '\n' | head -c 100)' buttons='$($HTMLQ --attribute href a.btn <<<"$resp" | tr '\n' ' ' | head -c 200)'"
 	url=$(echo "$resp" | $HTMLQ --base https://www.apkmirror.com --attribute href "a.btn") || return 1
 	url=$(req "$url" - | $HTMLQ --base https://www.apkmirror.com --attribute href "span > a[rel = nofollow]") || return 1
 

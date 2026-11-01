@@ -23,5 +23,5 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 [TikTok]
 rv-brand = "Morphe"
 patches-source = "SysAdminDoc/hushfeed"
-apkmirror-dlurl = "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/"
+apkmirror-dlurl = "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly"
 # archive-dlurl = "https://archive.org/download/tme89-apks/apks/com.zhiliaoapp.musically/"

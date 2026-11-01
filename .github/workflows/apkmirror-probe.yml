@@ -3,6 +3,22 @@ name: APKMirror probe
 on:
   workflow_dispatch:
     inputs:
+      app_url:
+        description: APKMirror app page to test, exactly as written in config.toml (empty = first apkmirror-dlurl of config.toml)
+        type: string
+        default: ""
+      version:
+        description: Version to download (empty = highest version listed by APKMirror, as for apps without a patch version limit)
+        type: string
+        default: ""
+      arch:
+        description: Architecture requested by the build
+        type: string
+        default: arm64-v8a
+      repeat:
+        description: How many times the whole chain is replayed in a row
+        type: string
+        default: "2"
       full_download:
         description: Download the whole APK to prove the complete chain
         type: boolean
@@ -14,7 +30,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -24,10 +40,12 @@ jobs:
           curl -fsS --max-time 20 https://ipinfo.io/json | jq '{ip, org, city, country}' || echo "ipinfo unavailable"
 
       - name: Compare request methods
+        env:
+          INPUT_APP_URL: ${{ inputs.app_url }}
         run: |
           python3 -m pip install -q --disable-pip-version-check --break-system-packages curl_cffi >/dev/null 2>&1 ||
             python3 -m pip install -q --disable-pip-version-check curl_cffi >/dev/null 2>&1 || true
-          APP_URL=$(grep -m1 -oP 'apkmirror-dlurl\s*=\s*"\K[^"]+' config.toml)
+          APP_URL=${INPUT_APP_URL:-$(grep -m1 -oP 'apkmirror-dlurl\s*=\s*"\K[^"]+' config.toml)}
           export APP_URL
           python3 - <<'PY'
           import os
@@ -116,6 +134,10 @@ jobs:
       - name: End-to-end with the real utils.sh functions
         env:
           FULL_DOWNLOAD: ${{ inputs.full_download }}
+          INPUT_APP_URL: ${{ inputs.app_url }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_ARCH: ${{ inputs.arch }}
+          INPUT_REPEAT: ${{ inputs.repeat }}
         run: |
           set -uo pipefail
           mkdir -p temp build
@@ -126,39 +148,69 @@ jobs:
             pr "Bundle downloaded: $(du -h "$1" | cut -f1)"
             : >"$2"
           }
-          url=$(grep -m1 -oP 'apkmirror-dlurl\s*=\s*"\K[^"]+' config.toml)
-          url=${url%/}
-          pr "App page: $url"
-
-          if ! get_apkmirror_resp "$url"; then
-            epr "Step 1 failed: the app page cannot be loaded"
-            exit 1
-          fi
-          pkg=$(get_apkmirror_pkg_name)
-          if [ -z "$pkg" ]; then
-            epr "Step 1 failed: a page was returned but it holds no package name (block page, or APKMirror layout changed)"
-            head -c 300 <<<"$__APKMIRROR_RESP__" | tr '\n' ' ' >&2
-            echo >&2
-            exit 1
-          fi
-          pr "Step 1 ok, package name: $pkg"
-
-          vers=$(get_apkmirror_vers)
-          version=$(get_highest_ver <<<"$vers") || version=$(head -1 <<<"$vers")
-          if [ -z "$version" ]; then
-            epr "Step 2 failed: no version found in the uploads page"
-            exit 1
-          fi
-          pr "Step 2 ok, versions seen: $(wc -w <<<"$vers"), chosen: $version"
-
-          if [ "$FULL_DOWNLOAD" != true ]; then
-            pr "Download skipped by input, steps 1 and 2 are enough to prove page access"
-            exit 0
+          url=${INPUT_APP_URL:-$(grep -m1 -oP 'apkmirror-dlurl\s*=\s*"\K[^"]+' config.toml)}
+          arch=${INPUT_ARCH:-arm64-v8a}
+          repeat=${INPUT_REPEAT:-1}
+          [[ "$repeat" =~ ^[0-9]+$ ]] && [ "$repeat" -ge 1 ] || repeat=1
+          pr "App page: $url | arch: $arch | version: ${INPUT_VERSION:-highest listed} | rounds: $repeat"
+          if [[ "$url" == */ ]]; then
+            epr "The app URL ends with a slash: upstream builds '//' in the release URL when it has one. Remove it in config.toml"
           fi
 
-          if ! dl_apkmirror "$url" "$version" "temp/probe.apk" arm64-v8a ""; then
-            epr "Step 3 failed: the download chain broke (release page, download page or file)"
+          round() {
+            local n=$1 pkg vers version out kind
+            if ! get_apkmirror_resp "$url"; then
+              epr "Round $n, step 1 failed: the app page cannot be loaded"
+              return 1
+            fi
+            pkg=$(get_apkmirror_pkg_name)
+            if [ -z "$pkg" ]; then
+              epr "Round $n, step 1 failed: a page was returned but it holds no package name (block page, or APKMirror layout changed)"
+              head -c 300 <<<"$__APKMIRROR_RESP__" | tr '\n' ' ' >&2
+              echo >&2
+              return 1
+            fi
+            if [ "$(wc -l <<<"$pkg")" -gt 1 ]; then
+              epr "Round $n, step 1 failed: several package names found on this page: $(tr '\n' ' ' <<<"$pkg")"
+              return 1
+            fi
+            pr "Round $n, step 1 ok, package name: $pkg"
+
+            version=${INPUT_VERSION:-}
+            if [ -z "$version" ]; then
+              vers=$(get_apkmirror_vers)
+              version=$(get_highest_ver <<<"$vers") || version=$(head -1 <<<"$vers")
+              if [ -z "$version" ]; then
+                epr "Round $n, step 2 failed: no version found in the uploads page"
+                return 1
+              fi
+              pr "Round $n, step 2 ok, versions seen: $(wc -w <<<"$vers"), chosen: $version"
+            else
+              pr "Round $n, step 2 skipped, version imposed: $version"
+            fi
+
+            if [ "$FULL_DOWNLOAD" != true ]; then
+              return 0
+            fi
+
+            out="temp/probe-$n.apk"
+            rm -f "$out" "$out.apkm"
+            if ! dl_apkmirror "$url" "$version" "$out" "$arch" ""; then
+              epr "Round $n, step 3 failed: the download chain broke (release page, variant, download page or file)"
+              return 1
+            fi
+            if [ -f "$out.apkm" ]; then kind="bundle (.apkm)"; else kind="plain APK"; fi
+            pr "Round $n, step 3 ok, format: $kind"
+            ls -lh temp/ | grep "probe-$n"
+            rm -f "$out" "$out.apkm"
+          }
+
+          failed=0
+          for i in $(seq 1 "$repeat"); do
+            round "$i" || failed=$((failed + 1))
+          done
+          pr "Rounds failed: $failed/$repeat"
+          if [ "$failed" -gt 0 ]; then
             exit 1
           fi
-          ls -lh temp/ | tail -n +2
-          pr "Step 3 ok: the complete chain works from this runner"
+          pr "All rounds ok: the complete chain works from this runner"

@@ -557,6 +557,83 @@ jobs:
                   if not any(path == f or path.startswith(f + "/") for f in files):
                       problems.append(f"Unexpected change outside the synced files: `{path}`.")
 
+              if not problems:
+                  check_apkmirror_hook(problems, warnings)
+
+
+          HOOK_SCRIPT = r"""source ./utils.sh
+          sleep() { :; }
+          base="$1"
+          out=$(req "$base/page?apkmirror.com" -) && echo "T1_RC=0" || echo "T1_RC=$?"
+          printf 'T1_BODY=%s\n' "$out"
+          req "$base/file?apkmirror.com" "$PWD/got.bin" && echo "T2_RC=0" || echo "T2_RC=$?"
+          printf 'T2_BODY=%s\n' "$(cat got.bin 2>/dev/null)"
+          req "$base/missing?apkmirror.com" - >/dev/null 2>&1 && echo "T3_RC=0" || echo "T3_RC=$?"
+          """
+
+
+          def check_apkmirror_hook(problems, warnings):
+              import http.server
+              import shutil
+              import tempfile
+              import threading
+
+              text = read("utils.sh")
+              hosts = sorted(set(re.findall(r"https?://([A-Za-z0-9.-]*apkmirror[A-Za-z0-9.-]*)", text)))
+              odd = [h for h in hosts if not h.endswith("apkmirror.com")]
+              if odd:
+                  warnings.append("`utils.sh` now uses APKMirror host(s) the anti-bot layer does not intercept: " + ", ".join(odd) + ". The `curl` override in the sync rules must be widened.")
+
+              seen = []
+
+              class Handler(http.server.BaseHTTPRequestHandler):
+                  def log_message(self, *args):
+                      pass
+
+                  def do_GET(self):
+                      seen.append((self.path.split("?")[0], self.headers.get("User-Agent", ""), self.headers.get("Referer", "")))
+                      code, body = (404, b"missing") if self.path.startswith("/missing") else (200, b"APKM-HOOK-OK")
+                      self.send_response(code)
+                      self.send_header("Content-Length", str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+
+              work = tempfile.mkdtemp(prefix="apkm-hook-")
+              server = None
+              try:
+                  server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+                  threading.Thread(target=server.serve_forever, daemon=True).start()
+                  shutil.copy("utils.sh", work)
+                  os.makedirs(os.path.join(work, "temp"))
+                  open(os.path.join(work, "temp", ".cffi_no"), "w").close()
+                  env = {k: v for k, v in os.environ.items() if not k.startswith("GITHUB_")}
+                  env["NO_PROXY"] = env["no_proxy"] = "127.0.0.1"
+                  r = subprocess.run(["bash", "-c", HOOK_SCRIPT, "bash", f"http://127.0.0.1:{server.server_address[1]}"], cwd=work, env=env, text=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=90)
+              except Exception as exc:
+                  warnings.append(f"APKMirror anti-bot self-test could not run: {exc}")
+                  return
+              finally:
+                  if server is not None:
+                      server.shutdown()
+                  shutil.rmtree(work, ignore_errors=True)
+
+              got = dict(re.findall(r"^(T\d_[A-Z]+)=(.*)$", r.stdout, re.M))
+              if "T1_RC" not in got:
+                  warnings.append("APKMirror anti-bot self-test could not source the patched `utils.sh`: " + (r.stderr.strip().splitlines() or ["no output"])[-1][:200])
+                  return
+              if got.get("T1_RC") == "127":
+                  problems.append("`req` is no longer callable after sourcing the patched `utils.sh` (renamed or removed upstream?). The APKMirror self-test and the `curl` override in the sync rules must be adapted to the new request function.")
+                  return
+              reached = {path: (ua, ref) for path, ua, ref in seen}
+              intercepted = all(p in reached and "Chrome/" in reached[p][0] and "apkmirror.com" in reached[p][1] for p in ("/page", "/file"))
+              if not intercepted:
+                  problems.append("The APKMirror anti-bot layer is no longer reached: upstream changed how `utils.sh` sends HTTP requests (`req`/`_req`), so the `curl` override is bypassed. The override in the sync rules must be adapted to the new request code.")
+                  return
+              if got.get("T1_RC") != "0" or got.get("T1_BODY") != "APKM-HOOK-OK" or got.get("T2_RC") != "0" or got.get("T2_BODY") != "APKM-HOOK-OK":
+                  problems.append("The APKMirror anti-bot layer is reached but no longer returns the page or the file through `req` as upstream expects (stdout mode or file mode).")
+              elif got.get("T3_RC") in (None, "0"):
+                  problems.append("The APKMirror anti-bot layer no longer reports HTTP errors (404) to `req`, so upstream error handling would be skipped.")
+
 
           def upstream_changes(old, new, paths):
               if not old:

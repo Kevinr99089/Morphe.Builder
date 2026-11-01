@@ -1,0 +1,164 @@
+name: APKMirror probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      full_download:
+        description: Download the whole APK to prove the complete chain
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Runner network identity
+        run: |
+          curl -fsS --max-time 20 https://ipinfo.io/json | jq '{ip, org, city, country}' || echo "ipinfo unavailable"
+
+      - name: Compare request methods
+        run: |
+          python3 -m pip install -q --disable-pip-version-check --break-system-packages curl_cffi >/dev/null 2>&1 ||
+            python3 -m pip install -q --disable-pip-version-check curl_cffi >/dev/null 2>&1 || true
+          APP_URL=$(grep -m1 -oP 'apkmirror-dlurl\s*=\s*"\K[^"]+' config.toml)
+          export APP_URL
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          import tempfile
+
+          BASE = os.environ.get("PROBE_BASE", "https://www.apkmirror.com")
+          APP = os.environ["APP_URL"].rstrip("/")
+          CAT = APP.rsplit("/", 1)[-1]
+          URLS = [BASE + "/", APP, f"{BASE}/uploads/?appcategory={CAT}"]
+
+          FIREFOX_UA = "Mozilla/5.0 (X11; Linux x86_64; rv:108.0) Gecko/20100101 Firefox/108.0"
+          CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+          CHROME_HEADERS = [
+              "User-Agent: " + CHROME_UA,
+              "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+              "Accept-Language: en-US,en;q=0.9",
+              "Referer: https://www.apkmirror.com/",
+              "Upgrade-Insecure-Requests: 1",
+              "Sec-Fetch-Dest: document",
+              "Sec-Fetch-Mode: navigate",
+              "Sec-Fetch-Site: same-origin",
+          ]
+
+
+          def title_of(text):
+              m = re.search(r"<title>(.*?)</title>", text, re.S | re.I)
+              return re.sub(r"\s+", " ", m.group(1)).strip()[:60] if m else "-"
+
+
+          def header_of(block, name):
+              m = re.search(r"^" + name + r":\s*(.+)$", block, re.M | re.I)
+              return m.group(1).strip() if m else "-"
+
+
+          def via_curl(url, headers):
+              hdr = tempfile.mktemp()
+              body = tempfile.mktemp()
+              cmd = ["curl", "-sS", "-L", "--compressed", "--connect-timeout", "15", "-m", "60", "-D", hdr, "-o", body, "-w", "%{http_code}"]
+              for h in headers:
+                  cmd += ["-H", h]
+              r = subprocess.run(cmd + [url], capture_output=True, text=True)
+              code = r.stdout.strip() or "ERR"
+              blocks = [b for b in open(hdr, errors="replace").read().split("\r\n\r\n") if b.strip()] if os.path.exists(hdr) else []
+              last = blocks[-1] if blocks else ""
+              text = open(body, errors="replace").read(20000) if os.path.exists(body) else ""
+              return code, header_of(last, "cf-mitigated"), title_of(text)
+
+
+          def via_cffi(url):
+              from curl_cffi import requests
+              s = requests.Session(impersonate="chrome")
+              r = s.get(url, headers={"Referer": "https://www.apkmirror.com/"}, timeout=60, allow_redirects=True)
+              return str(r.status_code), r.headers.get("cf-mitigated", "-"), title_of(r.text)
+
+
+          METHODS = [
+              ("curl, Firefox UA (original upstream)", lambda u: via_curl(u, ["User-Agent: " + FIREFOX_UA])),
+              ("curl, Chrome headers (shim fallback)", lambda u: via_curl(u, CHROME_HEADERS)),
+              ("curl_cffi, Chrome TLS (shim primary)", via_cffi),
+          ]
+
+          rows = []
+          wins = {}
+          for name, fn in METHODS:
+              for url in URLS:
+                  try:
+                      code, mitigated, title = fn(url)
+                  except Exception as exc:
+                      code, mitigated, title = "ERR", "-", str(exc)[:60]
+                  ok = code.startswith("2") and not re.search(r"just a moment|attention required|access denied", title, re.I)
+                  wins[name] = wins.get(name, 0) + (1 if ok else 0)
+                  rows.append(f"| {name} | {url.replace(BASE, '') or '/'} | {code} | {mitigated} | {title} | {'OK' if ok else 'BLOCKED'} |")
+
+          lines = ["## APKMirror access from this runner", "", "| Method | Page | HTTP | cf-mitigated | Title | Verdict |", "|---|---|---|---|---|---|", *rows, ""]
+          for name, _ in METHODS:
+              lines.append(f"- {name}: {wins.get(name, 0)}/{len(URLS)} pages reachable")
+          out = "\n".join(lines) + "\n"
+          print(out)
+          if os.environ.get("GITHUB_STEP_SUMMARY"):
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+                  f.write(out)
+          PY
+
+      - name: End-to-end with the real utils.sh functions
+        env:
+          FULL_DOWNLOAD: ${{ inputs.full_download }}
+        run: |
+          set -uo pipefail
+          mkdir -p temp build
+          source utils.sh
+          set_prebuilts
+          chmod +x "$HTMLQ"
+          merge_splits() {
+            pr "Bundle downloaded: $(du -h "$1" | cut -f1)"
+            : >"$2"
+          }
+          url=$(grep -m1 -oP 'apkmirror-dlurl\s*=\s*"\K[^"]+' config.toml)
+          url=${url%/}
+          pr "App page: $url"
+
+          if ! get_apkmirror_resp "$url"; then
+            epr "Step 1 failed: the app page cannot be loaded"
+            exit 1
+          fi
+          pkg=$(get_apkmirror_pkg_name)
+          if [ -z "$pkg" ]; then
+            epr "Step 1 failed: a page was returned but it holds no package name (block page, or APKMirror layout changed)"
+            head -c 300 <<<"$__APKMIRROR_RESP__" | tr '\n' ' ' >&2
+            echo >&2
+            exit 1
+          fi
+          pr "Step 1 ok, package name: $pkg"
+
+          vers=$(get_apkmirror_vers)
+          version=$(get_highest_ver <<<"$vers") || version=$(head -1 <<<"$vers")
+          if [ -z "$version" ]; then
+            epr "Step 2 failed: no version found in the uploads page"
+            exit 1
+          fi
+          pr "Step 2 ok, versions seen: $(wc -w <<<"$vers"), chosen: $version"
+
+          if [ "$FULL_DOWNLOAD" != true ]; then
+            pr "Download skipped by input, steps 1 and 2 are enough to prove page access"
+            exit 0
+          fi
+
+          if ! dl_apkmirror "$url" "$version" "temp/probe.apk" arm64-v8a ""; then
+            epr "Step 3 failed: the download chain broke (release page, download page or file)"
+            exit 1
+          fi
+          ls -lh temp/ | tail -n +2
+          pr "Step 3 ok: the complete chain works from this runner"

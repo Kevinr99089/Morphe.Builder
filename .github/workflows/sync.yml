@@ -463,16 +463,20 @@ jobs:
               return text + "\n" + APKM_SNIPPET, "appended at the end of the file, no upstream line touched"
 
 
-          APKM_TIKTOK_OLD = '\turl="${url}/${apkmname}-${version//./-}-release/"\n'
-          APKM_TIKTOK_NEW = '\tcase "$url" in *tik-tok-including-musical-ly) apkmname="tiktok" ;; esac\n' + APKM_TIKTOK_OLD
+          APKM_DEBUG_ANCHOR = '\turl=$(echo "$resp" | $HTMLQ --base https://www.apkmirror.com --attribute href "a.btn") || return 1\n'
+          APKM_DEBUG_LINE = (
+              '\tepr "DEBUG apkmirror: release=\'$url\' variant=\'$dlurl\' size=${#resp} '
+              'title=\'$($HTMLQ --text title <<<"$resp" | tr -d \'\\n\' | head -c 100)\' '
+              'buttons=\'$($HTMLQ --attribute href a.btn <<<"$resp" | tr \'\\n\' \' \' | head -c 200)\'"\n'
+          )
 
 
-          def apkmirror_tiktok_slug(text):
-              if 'apkmname="tiktok"' in text:
+          def apkmirror_debug(text):
+              if "DEBUG apkmirror:" in text:
                   return text, "already present"
-              if text.count(APKM_TIKTOK_OLD) != 1:
+              if text.count(APKM_DEBUG_ANCHOR) != 1:
                   return None
-              return text.replace(APKM_TIKTOK_OLD, APKM_TIKTOK_NEW), "TikTok release slug forced"
+              return text.replace(APKM_DEBUG_ANCHOR, APKM_DEBUG_LINE + APKM_DEBUG_ANCHOR), "APKMirror debug line added"
 
 
           PATCHES = [
@@ -484,7 +488,7 @@ jobs:
               ("Force APK-only mode", "utils.sh", force_apk_mode, False),
               ("Config update: use first release asset", "utils.sh", config_update_first_asset, False),
               ("Anti-bot: browser-grade APKMirror requests", "utils.sh", apkmirror_antibot, False),
-              ("TikTok: APKMirror release slug", "utils.sh", apkmirror_tiktok_slug, False),
+              ("Debug: APKMirror variant page", "utils.sh", apkmirror_debug, False),
               ("CI: last build read from latest release", CI_YML, use_release_body, True),
               ("CI: schedule", CI_YML, set_cron, False),
               ("Build: last build read from latest release", BUILD_YML, use_release_body, False),

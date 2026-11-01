@@ -16,9 +16,13 @@ on:
         type: string
         default: arm64-v8a
       repeat:
-        description: How many times the whole chain is replayed in a row
+        description: How many times the whole chain is replayed in a row (each replay adds load on APKMirror, keep it low)
         type: string
-        default: "2"
+        default: "1"
+      compare_methods:
+        description: Also run the request-method comparison (9 extra requests to APKMirror)
+        type: boolean
+        default: false
       full_download:
         description: Download the whole APK to prove the complete chain
         type: boolean
@@ -40,6 +44,7 @@ jobs:
           curl -fsS --max-time 20 https://ipinfo.io/json | jq '{ip, org, city, country}' || echo "ipinfo unavailable"
 
       - name: Compare request methods
+        if: ${{ inputs.compare_methods }}
         env:
           INPUT_APP_URL: ${{ inputs.app_url }}
         run: |
@@ -158,19 +163,11 @@ jobs:
           fi
 
           diag() {
-            local name rel page
-            name=$($HTMLQ "h1.marginZero" --text <<<"$__APKMIRROR_RESP__")
-            name="${name,,}"
-            name="${name// /-}"
-            name="${name//[^a-z0-9-]/}"
-            rel="${url%/}/${name}-${1//./-}-release/"
-            if ! page=$(req "$rel" - 2>/dev/null); then
-              pr "Diag: the release page request failed: $rel"
-              return 0
+            if [ -s "$TEMP_DIR/.apkm_last_failure" ]; then
+              pr "Diag: last failing step: $(cat "$TEMP_DIR/.apkm_last_failure")"
+            else
+              pr "Diag: no failing step was recorded"
             fi
-            pr "Diag: $rel"
-            pr "Diag: $(wc -c <<<"$page") bytes, title: $(grep -o -i '<title>[^<]*' <<<"$page" | head -1 | cut -c8-90)"
-            pr "Diag: variant rows: $($HTMLQ 'div.table-row.headerFont' --text <<<"$page" 2>/dev/null | grep -c .), download buttons: $($HTMLQ 'a.btn' --attribute href <<<"$page" 2>/dev/null | wc -l)"
           }
 
           round() {
@@ -213,7 +210,7 @@ jobs:
             rm -f "$out" "$out.apkm"
             if ! dl_apkmirror "$url" "$version" "$out" "$arch" ""; then
               epr "Round $n, step 3 failed: the download chain broke (release page, variant, download page or file)"
-              diag "$version"
+              diag
               return 1
             fi
             if [ -f "$out.apkm" ]; then kind="bundle (.apkm)"; else kind="plain APK"; fi
@@ -225,6 +222,7 @@ jobs:
           failed=0
           for i in $(seq 1 "$repeat"); do
             round "$i" || failed=$((failed + 1))
+            if [ "$i" -lt "$repeat" ]; then sleep 60; fi
           done
           pr "Rounds failed: $failed/$repeat"
           if [ "$failed" -gt 0 ]; then

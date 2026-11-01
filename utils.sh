@@ -968,7 +968,7 @@ CFFI_PY
 }
 
 _apkm_blocked() {
-    grep -qaiE '<title>(just a moment|attention required)' <(head -c 8192 "$1" 2>/dev/null)
+    grep -qaiE '<title>(just a moment|attention required|access denied|verifying you are human|too many requests|one more step)' <(head -c 8192 "$1" 2>/dev/null)
 }
 
 _apkm_once() {
@@ -1009,7 +1009,7 @@ _apkm_fetch() {
         if [ "$rc" -eq 22 ]; then break; fi
         if [ "$try" -lt 3 ]; then
             echo "[!] APKMirror blocked or unreachable (try $try/3), waiting before retry: $url" >&2
-            sleep $((try * 6 + RANDOM % 6))
+            sleep $((try * 10 + RANDOM % 6))
         fi
     done
     rm -f "$tmpf"
@@ -1031,16 +1031,126 @@ curl() {
     _apkm_fetch "$url" "$out"
 }
 
+_apkm_fail() {
+    printf '%s\n' "$1" >"$TEMP_DIR/.apkm_last_failure" 2>/dev/null || :
+    echo "[!] APKMirror: $1" >&2
+    return 1
+}
+
+_apkm_page_hint() {
+    local page="$1" title size
+    size=$(printf '%s' "$page" | wc -c | tr -d ' ')
+    title=$(printf '%s' "$page" | grep -o -i -m1 '<title>[^<]*' | head -1 | cut -c8-80) || title=""
+    printf 'size %s bytes, title: %s' "$size" "${title:--}"
+}
+
+_apkm_extract() {
+    local page="$1" pattern="$2" sel link
+    shift 2
+    for sel in "$@"; do
+        link=$($HTMLQ --base https://www.apkmirror.com --attribute href "$sel" <<<"$page" 2>/dev/null | grep -m1 -E -- "$pattern") || link=""
+        if [ -n "$link" ]; then
+            printf '%s\n' "$link"
+            return 0
+        fi
+    done
+    return 1
+}
+
+_apkm_pick_link() {
+    local page_url="$1" pattern="$2" label="$3" try page="" link
+    shift 3
+    for try in 1 2 3; do
+        if ! page=$(req "$page_url" -) || [ -z "$page" ]; then
+            _apkm_fail "$label: the page could not be loaded: $page_url"
+            return 1
+        fi
+        if link=$(_apkm_extract "$page" "$pattern" "$@"); then
+            printf '%s\n' "$link"
+            return 0
+        fi
+        echo "[!] APKMirror: $label not found on the page (try $try/3, $(_apkm_page_hint "$page"))" >&2
+        if [ "$try" -lt 3 ]; then sleep $((try * 8 + RANDOM % 6)); fi
+    done
+    _apkm_fail "$label not found after 3 loads of $page_url ($(_apkm_page_hint "$page"))"
+}
+
+_apkm_is_zip() {
+    [ -s "$1" ] && [ "$(head -c 2 "$1" 2>/dev/null)" = "PK" ]
+}
+
 if declare -F dl_apkmirror >/dev/null && ! declare -F _dl_apkmirror_once >/dev/null; then
-    eval "$(declare -f dl_apkmirror | sed '1s/^dl_apkmirror/_dl_apkmirror_once/')"
+    _dl_apkmirror_once() {
+        local url=$1 version=${2// /-} output=$3 arch=$4 dpi=$5 is_bundle=false
+        local resp node apkmname dlurl="" type page_url file_page file_url dest
+
+        if [ -f "${output}.apkm" ]; then
+            merge_splits "${output}.apkm" "${output}"
+            return 0
+        fi
+
+        if [ "$arch" = "arm-v7a" ]; then arch="armeabi-v7a"; fi
+        apkmname=$($HTMLQ "h1.marginZero" --text <<<"$__APKMIRROR_RESP__")
+        apkmname="${apkmname,,}" apkmname="${apkmname// /-}" apkmname="${apkmname//[^a-z0-9-]/}"
+        if [ -z "$apkmname" ]; then
+            _apkm_fail "app name not found on the app page" || return 1
+        fi
+
+        page_url="${url%/}/${apkmname}-${version//./-}-release/"
+        if ! resp=$(req "$page_url" -) || [ -z "$resp" ]; then
+            _apkm_fail "release page could not be loaded: $page_url" || return 1
+        fi
+
+        node=$($HTMLQ "div.table-row.headerFont:nth-last-child(1)" -r "span:nth-child(n+3)" <<<"$resp")
+        if [ -n "$node" ]; then
+            for type in APK BUNDLE; do
+                if dlurl=$(apkmirror_search "$resp" "$dpi" "$arch" "$type"); then
+                    if [ "$type" = "BUNDLE" ]; then is_bundle=true; fi
+                    break
+                fi
+                dlurl=""
+            done
+            if [ -z "$dlurl" ]; then
+                _apkm_fail "no variant matches arch '$arch' and dpi '${dpi:-any}' on $page_url" || return 1
+            fi
+            page_url="$dlurl"
+            resp=""
+        fi
+
+        file_page=""
+        if [ -n "$resp" ]; then
+            file_page=$(_apkm_extract "$resp" '/download/' 'a.btn' 'a.downloadButton') || file_page=""
+        fi
+        if [ -z "$file_page" ]; then
+            file_page=$(_apkm_pick_link "$page_url" '/download/' "variant download button" 'a.btn' 'a.downloadButton') || return 1
+        fi
+
+        file_url=$(_apkm_pick_link "$file_page" '.' "final file link" 'span > a[rel = nofollow]' 'a[rel = nofollow][href*="download.php"]' 'a[href*="download.php?id="]') || return 1
+
+        if [ "$is_bundle" = true ]; then dest="${output}.apkm"; else dest="$output"; fi
+        if ! req "$file_url" "$dest"; then
+            _apkm_fail "file download failed: $file_url" || return 1
+        fi
+        if ! _apkm_is_zip "$dest"; then
+            rm -f "$dest"
+            _apkm_fail "the downloaded file is not an APK (a block or error page was saved instead): $file_url" || return 1
+        fi
+        if [ "$is_bundle" = true ]; then merge_splits "$dest" "$output"; fi
+        return 0
+    }
+
     dl_apkmirror() {
         local try
+        rm -f "$TEMP_DIR/.apkm_last_failure" 2>/dev/null || :
         for try in 1 2 3 4; do
             if [ "$try" -gt 1 ]; then
                 echo "[!] APKMirror: download chain failed, restarting from the release page ($try/4)" >&2
-                sleep $((try * 8))
+                sleep $((try * 10 + RANDOM % 8))
             fi
-            _dl_apkmirror_once "$@" && return 0
+            if _dl_apkmirror_once "$@"; then
+                rm -f "$TEMP_DIR/.apkm_last_failure" 2>/dev/null || :
+                return 0
+            fi
         done
         return 1
     }

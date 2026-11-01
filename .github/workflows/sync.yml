@@ -452,6 +452,21 @@ jobs:
               fi
               _apkm_fetch "$url" "$out"
           }
+
+          if declare -F dl_apkmirror >/dev/null && ! declare -F _dl_apkmirror_once >/dev/null; then
+              eval "$(declare -f dl_apkmirror | sed '1s/^dl_apkmirror/_dl_apkmirror_once/')"
+              dl_apkmirror() {
+                  local try
+                  for try in 1 2 3 4; do
+                      if [ "$try" -gt 1 ]; then
+                          echo "[!] APKMirror: download chain failed, restarting from the release page ($try/4)" >&2
+                          sleep $((try * 8))
+                      fi
+                      _dl_apkmirror_once "$@" && return 0
+                  done
+                  return 1
+              }
+          fi
           '''
 
 
@@ -463,37 +478,6 @@ jobs:
               return text + "\n" + APKM_SNIPPET, "appended at the end of the file, no upstream line touched"
 
 
-          APKM_RETRY_OLD = (
-              '\turl=$(echo "$resp" | $HTMLQ --base https://www.apkmirror.com --attribute href "a.btn") || return 1\n'
-              '\turl=$(req "$url" - | $HTMLQ --base https://www.apkmirror.com --attribute href "span > a[rel = nofollow]") || return 1\n'
-          )
-          APKM_RETRY_LINES = [
-              (1, 'local rel_resp="$resp" final_url="" try'),
-              (1, 'for try in 1 2 3 4; do'),
-              (2, 'if [ "$try" -gt 1 ]; then'),
-              (3, 'echo "[!] APKMirror: no download link found, retrying ($try/4)" >&2'),
-              (3, 'sleep $((try * 8))'),
-              (3, 'if [ "$dlurl" ]; then resp=$(req "$dlurl" -) || resp=""; else resp="$rel_resp"; fi'),
-              (2, 'fi'),
-              (2, 'url=$(echo "$resp" | $HTMLQ --base https://www.apkmirror.com --attribute href "a.btn") || url=""'),
-              (2, 'if [ -z "$url" ]; then continue; fi'),
-              (2, 'final_url=$(req "$url" - | $HTMLQ --base https://www.apkmirror.com --attribute href "span > a[rel = nofollow]") || final_url=""'),
-              (2, 'if [ "$final_url" ]; then break; fi'),
-              (1, 'done'),
-              (1, 'if [ -z "$final_url" ]; then return 1; fi'),
-              (1, 'url="$final_url"'),
-          ]
-          APKM_RETRY_NEW = "".join("\t" * n + s + "\n" for n, s in APKM_RETRY_LINES)
-
-
-          def apkmirror_retry(text):
-              if "APKMirror: no download link found" in text:
-                  return text, "already present"
-              if text.count(APKM_RETRY_OLD) != 1:
-                  return None
-              return text.replace(APKM_RETRY_OLD, APKM_RETRY_NEW), "APKMirror download retries added"
-
-
           PATCHES = [
               ("Default patches source", "build.sh", set_default("DEF_PATCHES_SRC", PATCHES_SRC), True),
               ("Default CLI source", "build.sh", set_default("DEF_CLI_SRC", CLI_SRC), True),
@@ -503,7 +487,6 @@ jobs:
               ("Force APK-only mode", "utils.sh", force_apk_mode, False),
               ("Config update: use first release asset", "utils.sh", config_update_first_asset, False),
               ("Anti-bot: browser-grade APKMirror requests", "utils.sh", apkmirror_antibot, False),
-              ("APKMirror: retry download link", "utils.sh", apkmirror_retry, False),
               ("CI: last build read from latest release", CI_YML, use_release_body, True),
               ("CI: schedule", CI_YML, set_cron, False),
               ("Build: last build read from latest release", BUILD_YML, use_release_body, False),
@@ -601,6 +584,11 @@ jobs:
           req "$base/file?apkmirror.com" "$PWD/got.bin" && echo "T2_RC=0" || echo "T2_RC=$?"
           printf 'T2_BODY=%s\n' "$(cat got.bin 2>/dev/null)"
           req "$base/missing?apkmirror.com" - >/dev/null 2>&1 && echo "T3_RC=0" || echo "T3_RC=$?"
+          declare -F _dl_apkmirror_once >/dev/null && echo "T4_RC=0" || echo "T4_RC=1"
+          n=0
+          _dl_apkmirror_once() { n=$((n + 1)); [ "$n" -ge 3 ]; }
+          dl_apkmirror a b c d e >/dev/null 2>&1 && echo "T5_RC=0" || echo "T5_RC=1"
+          echo "T5_CALLS=$n"
           """
 
 
@@ -665,6 +653,10 @@ jobs:
                   problems.append("The APKMirror anti-bot layer is reached but no longer returns the page or the file through `req` as upstream expects (stdout mode or file mode).")
               elif got.get("T3_RC") in (None, "0"):
                   problems.append("The APKMirror anti-bot layer no longer reports HTTP errors (404) to `req`, so upstream error handling would be skipped.")
+              if got.get("T4_RC") != "0":
+                  problems.append("`dl_apkmirror` is no longer wrapped by the restart layer (renamed or removed upstream?), so a failed APKMirror download chain would not be retried from the release page.")
+              elif got.get("T5_RC") != "0" or got.get("T5_CALLS") != "3":
+                  problems.append("The APKMirror restart layer misbehaves: it should retry `dl_apkmirror` from the start until it succeeds.")
 
 
           def upstream_changes(old, new, paths):

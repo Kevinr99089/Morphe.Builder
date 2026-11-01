@@ -157,6 +157,22 @@ jobs:
             epr "The app URL ends with a slash: upstream builds '//' in the release URL when it has one. Remove it in config.toml"
           fi
 
+          diag() {
+            local name rel page
+            name=$($HTMLQ "h1.marginZero" --text <<<"$__APKMIRROR_RESP__")
+            name="${name,,}"
+            name="${name// /-}"
+            name="${name//[^a-z0-9-]/}"
+            rel="${url%/}/${name}-${1//./-}-release/"
+            if ! page=$(req "$rel" - 2>/dev/null); then
+              pr "Diag: the release page request failed: $rel"
+              return 0
+            fi
+            pr "Diag: $rel"
+            pr "Diag: $(wc -c <<<"$page") bytes, title: $(grep -o -i '<title>[^<]*' <<<"$page" | head -1 | cut -c8-90)"
+            pr "Diag: variant rows: $($HTMLQ 'div.table-row.headerFont' --text <<<"$page" 2>/dev/null | grep -c .), download buttons: $($HTMLQ 'a.btn' --attribute href <<<"$page" 2>/dev/null | wc -l)"
+          }
+
           round() {
             local n=$1 pkg vers version out kind
             if ! get_apkmirror_resp "$url"; then
@@ -197,6 +213,7 @@ jobs:
             rm -f "$out" "$out.apkm"
             if ! dl_apkmirror "$url" "$version" "$out" "$arch" ""; then
               epr "Round $n, step 3 failed: the download chain broke (release page, variant, download page or file)"
+              diag "$version"
               return 1
             fi
             if [ -f "$out.apkm" ]; then kind="bundle (.apkm)"; else kind="plain APK"; fi

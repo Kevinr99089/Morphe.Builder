@@ -440,20 +440,8 @@ dl_apkmirror() {
 		if [ -z "$dlurl" ]; then return 1; fi
 		resp=$(req "$dlurl" -)
 	fi
-	local rel_resp="$resp" final_url="" try
-	for try in 1 2 3 4; do
-		if [ "$try" -gt 1 ]; then
-			echo "[!] APKMirror: no download link found, retrying ($try/4)" >&2
-			sleep $((try * 8))
-			if [ "$dlurl" ]; then resp=$(req "$dlurl" -) || resp=""; else resp="$rel_resp"; fi
-		fi
-		url=$(echo "$resp" | $HTMLQ --base https://www.apkmirror.com --attribute href "a.btn") || url=""
-		if [ -z "$url" ]; then continue; fi
-		final_url=$(req "$url" - | $HTMLQ --base https://www.apkmirror.com --attribute href "span > a[rel = nofollow]") || final_url=""
-		if [ "$final_url" ]; then break; fi
-	done
-	if [ -z "$final_url" ]; then return 1; fi
-	url="$final_url"
+	url=$(echo "$resp" | $HTMLQ --base https://www.apkmirror.com --attribute href "a.btn") || return 1
+	url=$(req "$url" - | $HTMLQ --base https://www.apkmirror.com --attribute href "span > a[rel = nofollow]") || return 1
 
 	if [ "$is_bundle" = true ]; then
 		req "$url" "${output}.apkm" || return 1
@@ -1042,3 +1030,18 @@ curl() {
     fi
     _apkm_fetch "$url" "$out"
 }
+
+if declare -F dl_apkmirror >/dev/null && ! declare -F _dl_apkmirror_once >/dev/null; then
+    eval "$(declare -f dl_apkmirror | sed '1s/^dl_apkmirror/_dl_apkmirror_once/')"
+    dl_apkmirror() {
+        local try
+        for try in 1 2 3 4; do
+            if [ "$try" -gt 1 ]; then
+                echo "[!] APKMirror: download chain failed, restarting from the release page ($try/4)" >&2
+                sleep $((try * 8))
+            fi
+            _dl_apkmirror_once "$@" && return 0
+        done
+        return 1
+    }
+fi

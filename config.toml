@@ -7,14 +7,14 @@ rv-brand = "Morphe"
 excluded-patches = "'Swipe controls'"
 patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/logos/morphe_play/'"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
-archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
+# archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 
 [YT-Revancify] # Same patches applied as before, but with Extended icon:
 rv-brand = "Blue"
 excluded-patches = "'Swipe controls'"
 patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/logos/revancify_blue/'"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
-archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
+# archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 
 # [Music] is no longer available :
 # use [Metrolist](https://github.com/MetrolistGroup/Metrolist/releases/latest),
@@ -24,4 +24,4 @@ archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.y
 rv-brand = "Morphe"
 patches-source = "SysAdminDoc/hushfeed"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok/"
-archive-dlurl = "https://archive.org/download/tme89-apks/apks/com.zhiliaoapp.musically/"
+# archive-dlurl = "https://archive.org/download/tme89-apks/apks/com.zhiliaoapp.musically/"

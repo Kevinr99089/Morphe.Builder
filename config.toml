@@ -9,8 +9,8 @@ patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 # archive-dlurl = "https://archive.org/download/jhc-apks/apks/com.google.android.youtube"
 
-[YT-Revancify] # Same patches applied as before, but with Extended icon:
-rv-brand = "Blue"
+[YT-Revancify-blue] # Same patches applied as before, but with Extended icon:
+rv-brand = "Morphe"
 excluded-patches = "'Swipe controls'"
 patcher-args = "-e 'Custom branding' -OcustomName=YouTube -OcustomIcon='.github/logos/revancify_blue/'"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
@@ -21,7 +21,7 @@ apkmirror-dlurl = "https://www.apkmirror.com/apk/google-inc/youtube"
 # or [ArchiveTune](https://github.com/rukamori/archivetune/releases/latest) instead.
 
 [TikTok]
-rv-brand = "Morphe"
+rv-brand = "Hushfeed"
 patches-source = "SysAdminDoc/hushfeed"
 apkmirror-dlurl = "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly"
 # archive-dlurl = "https://archive.org/download/tme89-apks/apks/com.zhiliaoapp.musically/"
